@@ -24,8 +24,10 @@ export const uploadCSV = async (file: File) => {
 };
 
 // Get data from a specific CSV file
-export const getCSVData = async (filename: string): Promise<{ success: boolean; filename: string; count: number; patients: Patient[] }> => {
-  const response = await api.get(`/csv-data/${filename}`);
+export const getCSVData = async (filename: string, includeOutput: boolean = true): Promise<{ success: boolean; filename: string; count: number; patients: Patient[] }> => {
+  const response = await api.get(`/csv-data/${filename}`, {
+    params: { include_output: includeOutput }
+  });
   return response.data;
 };
 

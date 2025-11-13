@@ -5,6 +5,7 @@ import {
   MessageAlert,
   FileUpload,
   BatchCallButton,
+  DownloadButton,
   PatientTable,
   ConfirmModal,
   NotesModal
@@ -32,12 +33,12 @@ function App() {
     };
   }, []);
 
-  const loadPatientData = async (filename: string, silent: boolean = false) => {
+  const loadPatientData = async (filename: string, silent: boolean = false, includeOutput: boolean = true) => {
     if (!silent) {
       setLoading(true);
     }
     try {
-      const response = await getCSVData(filename);
+      const response = await getCSVData(filename, includeOutput);
       setPatients(response.patients);
     } catch (error) {
       console.error('Failed to load patient data:', error);
@@ -66,7 +67,7 @@ function App() {
       showMessage('success', `Parsed ${response.patient_count} patients successfully`);
       
       setCurrentFile(response.filename);
-      await loadPatientData(response.filename);
+      await loadPatientData(response.filename, false, false); // Don't include output - show fresh data
     } catch (error) {
       const err = error as { response?: { data?: { detail?: string } } };
       console.error('Upload failed:', error);
@@ -163,6 +164,11 @@ function App() {
               onClick={handleBatchCall}
               disabled={patients.length === 0 || callingInProgress}
               loading={callingInProgress}
+            />
+            
+            <DownloadButton 
+              filename={currentFile}
+              disabled={patients.length === 0}
             />
           </>
         )}

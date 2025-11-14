@@ -30,6 +30,7 @@ function App() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [activeCalls, setActiveCalls] = useState<Map<string, number>>(new Map()); // phone_number -> timestamp
   const refreshIntervalRef = useRef<number | null>(null);
 
   // Check if user is already logged in on mount
@@ -45,12 +46,33 @@ function App() {
     // Restore call status from localStorage
     const storedCallStatus = localStorage.getItem('callingInProgress');
     const storedCurrentFile = localStorage.getItem('currentFile');
+    const storedActiveCalls = localStorage.getItem('activeCalls');
     
     if (storedCallStatus === 'true' && storedCurrentFile) {
       setCallingInProgress(true);
       setCurrentFile(storedCurrentFile);
     } else if (storedCurrentFile) {
       setCurrentFile(storedCurrentFile);
+    }
+    
+    // Restore active calls from localStorage
+    if (storedActiveCalls) {
+      try {
+        const activeCallsData = JSON.parse(storedActiveCalls);
+        const now = Date.now();
+        const activeCallsMap = new Map<string, number>();
+        
+        // Only restore calls that are less than 10 minutes old
+        activeCallsData.forEach(([phone, timestamp]: [string, number]) => {
+          if (now - timestamp < 10 * 60 * 1000) { // 10 minutes
+            activeCallsMap.set(phone, timestamp);
+          }
+        });
+        
+        setActiveCalls(activeCallsMap);
+      } catch (e) {
+        console.error('Failed to restore active calls:', e);
+      }
     }
     
     setCheckingAuth(false);
@@ -164,15 +186,28 @@ function App() {
         return;
       }
       
+      // Track active calls - mark all successful calls as active
+      const newActiveCalls = new Map(activeCalls);
+      const now = Date.now();
+      
+      if (response.results?.calls) {
+        response.results.calls.forEach((call) => {
+          if (call.success && call.phone_number) {
+            // Mark call as active for next 10 minutes (calls typically last 5-10 minutes)
+            newActiveCalls.set(call.phone_number, now);
+          }
+        });
+        setActiveCalls(newActiveCalls);
+        
+        // Store in localStorage
+        const activeCallsData = Array.from(newActiveCalls.entries());
+        localStorage.setItem('activeCalls', JSON.stringify(activeCallsData));
+      }
+      
       showMessage('success', response.message);
       
-      // Calls are complete, but we'll refresh data to show updates
-      // Clear calling status after a short delay to allow user to see the success message
-      setTimeout(() => {
-        setCallingInProgress(false);
-        localStorage.removeItem('callingInProgress');
-      }, 2000);
-      
+      // Calls are initiated, keep status for auto-refresh
+      // Don't clear calling status immediately - let auto-refresh handle it
       startAutoRefresh();
       setTimeout(() => loadPatientData(currentFile, true), 1000);
     } catch (error) {
@@ -195,6 +230,27 @@ function App() {
       if (fileToRefresh && count < 40) {
         loadPatientData(fileToRefresh, true);
         count++;
+        
+        // Clean up old active calls (older than 10 minutes)
+        setActiveCalls((prevActiveCalls) => {
+          const now = Date.now();
+          const newActiveCalls = new Map(prevActiveCalls);
+          let updated = false;
+          
+          prevActiveCalls.forEach((timestamp, phone) => {
+            if (now - timestamp > 10 * 60 * 1000) { // 10 minutes
+              newActiveCalls.delete(phone);
+              updated = true;
+            }
+          });
+          
+          if (updated) {
+            const activeCallsData = Array.from(newActiveCalls.entries());
+            localStorage.setItem('activeCalls', JSON.stringify(activeCallsData));
+          }
+          
+          return newActiveCalls;
+        });
       } else {
         if (refreshIntervalRef.current) {
           clearInterval(refreshIntervalRef.current);
@@ -203,6 +259,9 @@ function App() {
         // Clear call status when refresh is done (after ~2 minutes)
         setCallingInProgress(false);
         localStorage.removeItem('callingInProgress');
+        // Clear active calls that are older than 10 minutes
+        setActiveCalls(new Map());
+        localStorage.removeItem('activeCalls');
       }
     }, 3000);
   };
@@ -228,6 +287,12 @@ function App() {
       const response = await callPatient(patient.phone_number);
       
       if (response.success) {
+        // Track this call as active
+        const newActiveCalls = new Map(activeCalls);
+        newActiveCalls.set(patient.phone_number, Date.now());
+        setActiveCalls(newActiveCalls);
+        localStorage.setItem('activeCalls', JSON.stringify(Array.from(newActiveCalls.entries())));
+        
         showMessage('success', response.message || `Call initiated to ${patient.patient_name}`);
         // Refresh patient data after a short delay to show updated notes
         setTimeout(() => {
@@ -331,6 +396,7 @@ function App() {
           loading={loading} 
           onViewNotes={handleViewNotes}
           onCallPatient={handleCallPatient}
+          activeCalls={activeCalls}
         />
 
         <ConfirmModal

@@ -11,10 +11,10 @@ export const BatchCallButton = ({ onClick, disabled, loading }: BatchCallButtonP
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold transition-all ${
+      className={`inline-flex items-center gap-2 px-6 py-3 border-2 border-teal-700 text-teal-700 rounded-xl font-semibold transition-all ${
         disabled 
-          ? 'opacity-60 cursor-not-allowed' 
-          : 'hover:bg-purple-700 hover:shadow-lg hover:-translate-y-0.5'
+          ? 'opacity-60 cursor-not-allowed border-gray-400 text-gray-400' 
+          : 'hover:bg-teal-50 hover:shadow-lg hover:-translate-y-0.5'
       }`}
     >
       <FiPhone size={18} />

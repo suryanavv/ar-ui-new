@@ -62,7 +62,7 @@ export const ProfileDropdown = ({ user, onLogout }: ProfileDropdownProps) => {
         }}
         className="flex items-center gap-2 hover:opacity-80 transition-opacity"
       >
-        <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm">
+        <div className="h-10 w-10 rounded-full bg-teal-700 flex items-center justify-center text-white font-semibold text-sm">
           {getInitials(user?.full_name, user?.email)}
         </div>
         <svg

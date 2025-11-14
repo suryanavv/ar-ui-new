@@ -48,7 +48,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-teal-50 to-cyan-50">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           {/* Logo and Title */}
@@ -85,7 +85,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none transition-colors"
+                  className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-teal-700 focus:outline-none transition-colors"
                   placeholder="admin@ezmedtech.com"
                   required
                 />
@@ -103,7 +103,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none transition-colors"
+                  className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-teal-700 focus:outline-none transition-colors"
                   placeholder="Enter your password"
                   required
                 />
@@ -114,10 +114,10 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3 px-4 bg-purple-600 text-white rounded-xl font-semibold transition-all ${
+              className={`w-full py-3 px-4 bg-teal-700 text-white rounded-xl font-semibold transition-all ${
                 loading
                   ? 'opacity-60 cursor-not-allowed'
-                  : 'hover:bg-purple-700 hover:shadow-lg hover:-translate-y-0.5'
+                  : 'hover:bg-teal-800 hover:shadow-lg hover:-translate-y-0.5'
               }`}
             >
               {loading ? 'Signing in...' : 'Sign In'}

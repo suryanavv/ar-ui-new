@@ -24,7 +24,7 @@ export const Header = ({ user, onLogout }: HeaderProps) => {
         
         {/* Title and Description - Center */}
         <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
-          <h1 className="text-2xl font-semibold text-teal-700 whitespace-nowrap">
+          <h1 className="text-3xl font-semibold text-teal-700 whitespace-nowrap">
             Account Receivability Dashboard
           </h1>
           <p className="text-sm text-gray-600 font-normal mt-1 whitespace-nowrap">

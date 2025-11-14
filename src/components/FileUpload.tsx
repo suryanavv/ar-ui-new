@@ -47,14 +47,14 @@ export const FileUpload = ({ onUpload, loading }: FileUploadProps) => {
 
   return (
     <div className="w-full">
-      <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-2xl border-2 border-dashed border-blue-300 hover:border-indigo-500 hover:shadow-xl transition-all duration-300 backdrop-blur-sm">
+      <div className="bg-gradient-to-br from-teal-50 via-cyan-50 to-teal-50 rounded-2xl border-2 border-dashed border-teal-700 hover:border-teal-600 hover:shadow-xl transition-all duration-300 backdrop-blur-sm">
         <div className="px-8 py-12 text-center">
           <div className="flex flex-col items-center gap-4">
-            <div className={`p-4 rounded-full ${loading ? 'bg-gray-100' : 'bg-green-50'} transition-colors`}>
+            <div className={`p-4 rounded-full ${loading ? 'bg-gray-100' : 'bg-teal-50'} transition-colors`}>
               {loading ? (
-                <div className="animate-spin rounded-full h-12 w-12 border-4 border-green-500 border-t-transparent"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-700 border-t-transparent"></div>
               ) : (
-                <FiUpload className="text-green-600" size={32} />
+                <FiUpload className="text-teal-700" size={32} />
               )}
             </div>
             
@@ -69,9 +69,9 @@ export const FileUpload = ({ onUpload, loading }: FileUploadProps) => {
 
             {selectedFile ? (
               <div className="w-full max-w-md space-y-3">
-                <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border-2 border-green-300 shadow-sm">
+                <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border-2 border-teal-700 shadow-sm">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <FiFile className="text-green-600 flex-shrink-0" size={20} />
+                    <FiFile className="text-teal-700 flex-shrink-0" size={20} />
                     <span className="text-sm font-medium text-gray-900 truncate">
                       {selectedFile.name}
                     </span>
@@ -87,10 +87,10 @@ export const FileUpload = ({ onUpload, loading }: FileUploadProps) => {
                 <button
                   onClick={handleUpload}
                   disabled={loading}
-                  className={`w-full inline-flex items-center justify-center gap-2 px-8 py-3 bg-green-500 text-white rounded-xl font-semibold transition-all ${
+                  className={`w-full inline-flex items-center justify-center gap-2 px-8 py-3 bg-teal-700 text-white rounded-xl font-semibold transition-all ${
                     loading 
                       ? 'opacity-60 cursor-not-allowed' 
-                      : 'hover:bg-green-600 hover:shadow-lg hover:-translate-y-0.5'
+                      : 'hover:bg-teal-800 hover:shadow-lg hover:-translate-y-0.5'
                   }`}
                 >
                   <FiUpload size={18} />
@@ -98,7 +98,7 @@ export const FileUpload = ({ onUpload, loading }: FileUploadProps) => {
                 </button>
               </div>
             ) : (
-              <label className={`inline-flex items-center gap-2 px-8 py-3 bg-green-500 text-white rounded-xl font-semibold cursor-pointer transition-all ${loading ? 'opacity-60 cursor-not-allowed' : 'hover:bg-green-600 hover:shadow-lg hover:-translate-y-0.5'}`}>
+              <label className={`inline-flex items-center gap-2 px-8 py-3 bg-teal-700 text-white rounded-xl font-semibold cursor-pointer transition-all ${loading ? 'opacity-60 cursor-not-allowed' : 'hover:bg-teal-800 hover:shadow-lg hover:-translate-y-0.5'}`}>
                 <FiFile size={18} />
                 <span>Choose File</span>
                 <input

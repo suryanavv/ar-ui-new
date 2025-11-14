@@ -6,12 +6,26 @@ interface PatientTableProps {
   loading: boolean;
   onViewNotes: (patient: Patient) => void;
   onCallPatient?: (patient: Patient) => void;
+  activeCalls?: Map<string, number>;
 }
 
-export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient }: PatientTableProps) => {
+export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, activeCalls = new Map() }: PatientTableProps) => {
+  // Check if call is currently active
+  const isCallActive = (phoneNumber: string): boolean => {
+    if (!activeCalls.has(phoneNumber)) return false;
+    const timestamp = activeCalls.get(phoneNumber)!;
+    const now = Date.now();
+    // Consider call active if initiated within last 10 minutes
+    return (now - timestamp) < 10 * 60 * 1000;
+  };
+
   // Check if patient only has "Call initiated" but no conversation
   const shouldShowCallButton = (patient: Patient): boolean => {
-    if (!patient.notes || !onCallPatient) return false;
+    if (!patient.notes || !onCallPatient || !patient.phone_number) return false;
+    
+    // Don't show call button if call is currently active (recently initiated)
+    if (isCallActive(patient.phone_number)) return false;
+    
     const notes = patient.notes.toLowerCase();
     
     // Must have "call initiated" to show the button
@@ -33,7 +47,7 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient }: 
                             notes.includes('scheduled') ||
                             (notes.length > 50 && hasCallInitiated); // If notes are long, likely has conversation
     
-    // Show button if call was initiated but no conversation happened
+    // Show button if call was initiated but no conversation happened (and it's not a recent call)
     return !hasConversation;
   };
   if (loading) {
@@ -46,29 +60,30 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient }: 
 
   if (patients.length === 0) {
     return (
-      <div className="bg-gradient-to-br from-cyan-50 via-sky-50 to-cyan-50 rounded-2xl border border-cyan-200/50 backdrop-blur-sm p-16 text-center">
-        <p className="text-cyan-900 text-xl font-medium mb-2">No patient data available</p>
-        <p className="text-cyan-700">Upload a CSV, XLSX, or XLS file to get started</p>
+      <div className="bg-gradient-to-br from-teal-50 via-cyan-50 to-teal-50 rounded-2xl border border-teal-200 backdrop-blur-sm p-16 text-center">
+        <p className="text-teal-900 text-xl font-medium mb-2">No patient data available</p>
+        <p className="text-teal-700">Upload a CSV, XLSX, or XLS file to get started</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-gradient-to-br from-violet-50 via-fuchsia-50 to-violet-50 rounded-2xl shadow-lg border border-violet-200/50 backdrop-blur-sm overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gradient-to-r from-green-500 to-emerald-600 text-white">
+          <thead className="border-b-2 border-teal-700">
             <tr>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Phone Number</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Patient Name</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Invoice #</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Price</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Outstanding</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Aging</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Link Requested</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Link Sent</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Est. Date</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Actions</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Phone Number</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Patient Name</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Invoice #</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Price</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Outstanding</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Aging</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Link Requested</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Link Sent</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Est. Date</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Status</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -102,11 +117,23 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient }: 
                   )}
                 </td>
                 <td className="px-4 py-4 text-sm">
+                  {isCallActive(patient.phone_number) ? (
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-green-800 rounded-md text-xs font-semibold">
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        Call Active
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 text-xs">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm">
                   <div className="flex items-center gap-2 flex-wrap">
                     {shouldShowCallButton(patient) && onCallPatient && (
                       <button
                         onClick={() => onCallPatient(patient)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition-colors"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-teal-600 text-teal-600 rounded-lg text-xs font-semibold hover:bg-teal-50 transition-colors"
                         title="Call patient again (call was initiated but no conversation)"
                       >
                         <FiPhone size={14} />
@@ -115,7 +142,7 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient }: 
                     )}
                     <button
                       onClick={() => onViewNotes(patient)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-xs font-semibold hover:bg-purple-200 transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-teal-600 text-teal-600 rounded-lg text-xs font-semibold hover:bg-teal-50 transition-colors"
                     >
                       <FiEye size={14} />
                       View Notes

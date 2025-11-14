@@ -82,7 +82,6 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, ac
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Link Requested</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Link Sent</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Est. Date</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Status</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Actions</th>
             </tr>
           </thead>
@@ -114,18 +113,6 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, ac
                     <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-md text-xs font-medium">{patient.estimated_date}</span>
                   ) : (
                     <span className="text-gray-400">-</span>
-                  )}
-                </td>
-                <td className="px-4 py-4 text-sm">
-                  {isCallActive(patient.phone_number) ? (
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-green-800 rounded-md text-xs font-semibold">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        Call Active
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="text-gray-400 text-xs">-</span>
                   )}
                 </td>
                 <td className="px-4 py-4 text-sm">

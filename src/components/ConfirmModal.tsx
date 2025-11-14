@@ -16,8 +16,8 @@ export const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: Co
       <div className="bg-white rounded-2xl max-w-md w-full mx-4 animate-fadeIn">
         <div className="p-6">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <FiAlertCircle className="text-purple-600" size={24} />
+            <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <FiAlertCircle className="text-teal-700" size={24} />
             </div>
             <div className="flex-1">
               <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
@@ -34,7 +34,7 @@ export const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: Co
             </button>
             <button
               onClick={onConfirm}
-              className="flex-1 px-4 py-2.5 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 transition-colors shadow-md"
+              className="flex-1 px-4 py-2.5 bg-teal-700 text-white rounded-xl font-semibold hover:bg-teal-800 transition-colors shadow-md"
             >
               Confirm
             </button>

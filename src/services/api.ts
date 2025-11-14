@@ -45,4 +45,10 @@ export const triggerBatchCall = async (
   return response.data;
 };
 
+// Call a single patient by phone number
+export const callPatient = async (phoneNumber: string): Promise<{ success: boolean; message: string }> => {
+  const response = await api.post(`/call-patient/${phoneNumber}`);
+  return response.data;
+};
+
 export default api;

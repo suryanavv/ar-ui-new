@@ -1,13 +1,41 @@
 import type { Patient } from '../types';
-import { FiEye } from 'react-icons/fi';
+import { FiEye, FiPhone } from 'react-icons/fi';
 
 interface PatientTableProps {
   patients: Patient[];
   loading: boolean;
   onViewNotes: (patient: Patient) => void;
+  onCallPatient?: (patient: Patient) => void;
 }
 
-export const PatientTable = ({ patients, loading, onViewNotes }: PatientTableProps) => {
+export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient }: PatientTableProps) => {
+  // Check if patient only has "Call initiated" but no conversation
+  const shouldShowCallButton = (patient: Patient): boolean => {
+    if (!patient.notes || !onCallPatient) return false;
+    const notes = patient.notes.toLowerCase();
+    
+    // Must have "call initiated" to show the button
+    const hasCallInitiated = notes.includes('call initiated');
+    if (!hasCallInitiated) return false;
+    
+    // Don't show if call failed (different from no conversation)
+    if (notes.includes('call failed')) return false;
+    
+    // Check if there's any conversation content (payment link, response, completed, etc.)
+    const hasConversation = notes.includes('payment link') || 
+                            notes.includes('link sent') ||
+                            notes.includes('call completed') || 
+                            notes.includes('conversation') ||
+                            notes.includes('patient responded') ||
+                            notes.includes('patient said') ||
+                            notes.includes('agreed to') ||
+                            notes.includes('declined') ||
+                            notes.includes('scheduled') ||
+                            (notes.length > 50 && hasCallInitiated); // If notes are long, likely has conversation
+    
+    // Show button if call was initiated but no conversation happened
+    return !hasConversation;
+  };
   if (loading) {
     return (
       <div className="text-center py-12 text-gray-600 font-medium text-lg">
@@ -40,7 +68,7 @@ export const PatientTable = ({ patients, loading, onViewNotes }: PatientTablePro
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Link Requested</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Link Sent</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Est. Date</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Notes</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -74,13 +102,25 @@ export const PatientTable = ({ patients, loading, onViewNotes }: PatientTablePro
                   )}
                 </td>
                 <td className="px-4 py-4 text-sm">
-                  <button
-                    onClick={() => onViewNotes(patient)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-xs font-semibold hover:bg-purple-200 transition-colors"
-                  >
-                    <FiEye size={14} />
-                    View Notes
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {shouldShowCallButton(patient) && onCallPatient && (
+                      <button
+                        onClick={() => onCallPatient(patient)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-semibold hover:bg-blue-600 transition-colors"
+                        title="Call patient again (call was initiated but no conversation)"
+                      >
+                        <FiPhone size={14} />
+                        Call
+                      </button>
+                    )}
+                    <button
+                      onClick={() => onViewNotes(patient)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-xs font-semibold hover:bg-purple-200 transition-colors"
+                    >
+                      <FiEye size={14} />
+                      View Notes
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

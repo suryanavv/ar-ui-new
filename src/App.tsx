@@ -11,7 +11,7 @@ import {
   NotesModal,
   LoginPage
 } from './components';
-import { uploadCSV, getCSVData, triggerBatchCall } from './services/api';
+import { uploadCSV, getCSVData, triggerBatchCall, callPatient } from './services/api';
 import type { Patient, Message, User } from './types';
 
 function App() {
@@ -217,6 +217,34 @@ function App() {
     setShowNotesModal(true);
   };
 
+  const handleCallPatient = async (patient: Patient) => {
+    if (!patient.phone_number) {
+      showMessage('error', 'Phone number not available');
+      return;
+    }
+
+    try {
+      showMessage('info', `Calling ${patient.patient_name} at ${patient.phone_number}...`);
+      const response = await callPatient(patient.phone_number);
+      
+      if (response.success) {
+        showMessage('success', response.message || `Call initiated to ${patient.patient_name}`);
+        // Refresh patient data after a short delay to show updated notes
+        setTimeout(() => {
+          if (currentFile) {
+            loadPatientData(currentFile, true, true);
+          }
+        }, 2000);
+      } else {
+        showMessage('error', response.message || 'Failed to initiate call');
+      }
+    } catch (error) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      console.error('Call failed:', error);
+      showMessage('error', err.response?.data?.detail || 'Failed to call patient');
+    }
+  };
+
   const handleUploadNewFile = () => {
     setCurrentFile('');
     setPatients([]);
@@ -298,7 +326,12 @@ function App() {
           </div>
         )}
 
-        <PatientTable patients={patients} loading={loading} onViewNotes={handleViewNotes} />
+        <PatientTable 
+          patients={patients} 
+          loading={loading} 
+          onViewNotes={handleViewNotes}
+          onCallPatient={handleCallPatient}
+        />
 
         <ConfirmModal
           isOpen={showConfirmModal}

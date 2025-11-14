@@ -1,5 +1,5 @@
-import { useRef } from 'react';
-import { FiUpload, FiFile } from 'react-icons/fi';
+import { useRef, useState } from 'react';
+import { FiUpload, FiFile, FiX } from 'react-icons/fi';
 
 interface FileUploadProps {
   onUpload: (file: File) => void;
@@ -8,14 +8,40 @@ interface FileUploadProps {
 
 export const FileUpload = ({ onUpload, loading }: FileUploadProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      onUpload(file);
+      const validExtensions = ['.csv', '.xlsx', '.xls'];
+      const isValid = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+      
+      if (!isValid) {
+        alert('Please select a CSV, XLSX, or XLS file');
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
+      
+      setSelectedFile(file);
+    }
+  };
+
+  const handleUpload = () => {
+    if (selectedFile) {
+      onUpload(selectedFile);
+      setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -37,22 +63,54 @@ export const FileUpload = ({ onUpload, loading }: FileUploadProps) => {
                 {loading ? 'Uploading file...' : 'Upload Patient Invoice File'}
               </h3>
               <p className="text-sm text-gray-500">
-                {loading ? 'Please wait while we process your file' : 'Drag and drop your file here, or click to browse'}
+                {loading ? 'Please wait while we process your file' : selectedFile ? 'File selected. Click Upload CSV to proceed.' : 'Drag and drop your file here, or click to browse'}
               </p>
             </div>
 
-            <label className={`inline-flex items-center gap-2 px-8 py-3 bg-green-500 text-white rounded-xl font-semibold cursor-pointer transition-all ${loading ? 'opacity-60 cursor-not-allowed' : 'hover:bg-green-600 hover:shadow-lg hover:-translate-y-0.5'}`}>
-              <FiFile size={18} />
-              <span>{loading ? 'Uploading...' : 'Choose File'}</span>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.xlsx,.xls"
-                onChange={handleFileChange}
-                disabled={loading}
-                className="hidden"
-              />
-            </label>
+            {selectedFile ? (
+              <div className="w-full max-w-md space-y-3">
+                <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border-2 border-green-300 shadow-sm">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <FiFile className="text-green-600 flex-shrink-0" size={20} />
+                    <span className="text-sm font-medium text-gray-900 truncate">
+                      {selectedFile.name}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleRemoveFile}
+                    disabled={loading}
+                    className="ml-2 p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
+                  >
+                    <FiX size={18} className="text-gray-500" />
+                  </button>
+                </div>
+                <button
+                  onClick={handleUpload}
+                  disabled={loading}
+                  className={`w-full inline-flex items-center justify-center gap-2 px-8 py-3 bg-green-500 text-white rounded-xl font-semibold transition-all ${
+                    loading 
+                      ? 'opacity-60 cursor-not-allowed' 
+                      : 'hover:bg-green-600 hover:shadow-lg hover:-translate-y-0.5'
+                  }`}
+                >
+                  <FiUpload size={18} />
+                  <span>{loading ? 'Uploading...' : 'Upload CSV'}</span>
+                </button>
+              </div>
+            ) : (
+              <label className={`inline-flex items-center gap-2 px-8 py-3 bg-green-500 text-white rounded-xl font-semibold cursor-pointer transition-all ${loading ? 'opacity-60 cursor-not-allowed' : 'hover:bg-green-600 hover:shadow-lg hover:-translate-y-0.5'}`}>
+                <FiFile size={18} />
+                <span>Choose File</span>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={handleFileChange}
+                  disabled={loading}
+                  className="hidden"
+                />
+              </label>
+            )}
 
             <div className="flex items-center gap-2 mt-2">
               <span className="text-xs text-gray-400">Supported formats:</span>

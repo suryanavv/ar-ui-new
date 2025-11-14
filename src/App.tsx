@@ -42,8 +42,35 @@ function App() {
       setUser(JSON.parse(storedUser));
     }
     
+    // Restore call status from localStorage
+    const storedCallStatus = localStorage.getItem('callingInProgress');
+    const storedCurrentFile = localStorage.getItem('currentFile');
+    
+    if (storedCallStatus === 'true' && storedCurrentFile) {
+      setCallingInProgress(true);
+      setCurrentFile(storedCurrentFile);
+    } else if (storedCurrentFile) {
+      setCurrentFile(storedCurrentFile);
+    }
+    
     setCheckingAuth(false);
   }, []);
+
+  // Load patient data when currentFile is restored from localStorage
+  useEffect(() => {
+    if (currentFile && !checkingAuth) {
+      loadPatientData(currentFile, false, true);
+      // Resume auto-refresh if call was in progress
+      const storedCallStatus = localStorage.getItem('callingInProgress');
+      if (storedCallStatus === 'true') {
+        // Use setTimeout to ensure currentFile state is updated
+        setTimeout(() => {
+          startAutoRefresh();
+        }, 100);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentFile, checkingAuth]);
 
   useEffect(() => {
     return () => {
@@ -63,10 +90,16 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
+    localStorage.removeItem('currentFile');
+    localStorage.removeItem('callingInProgress');
     setIsAuthenticated(false);
     setUser(null);
     setCurrentFile('');
     setPatients([]);
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
+    }
   };
 
   const loadPatientData = async (filename: string, silent: boolean = false, includeOutput: boolean = true) => {
@@ -89,20 +122,13 @@ function App() {
   };
 
   const handleFileUpload = async (file: File) => {
-    const validExtensions = ['.csv', '.xlsx', '.xls'];
-    const isValid = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-    
-    if (!isValid) {
-      showMessage('error', 'Please upload CSV, XLSX, or XLS file');
-      return;
-    }
-
     setUploadLoading(true);
     try {
       const response = await uploadCSV(file);
       showMessage('success', `Uploaded ${response.patient_count} patients successfully`);
       
       setCurrentFile(response.filename);
+      localStorage.setItem('currentFile', response.filename);
       await loadPatientData(response.filename, false, false);
     } catch (error) {
       const err = error as { response?: { data?: { detail?: string } } };
@@ -124,11 +150,28 @@ function App() {
   const confirmBatchCall = async () => {
     setShowConfirmModal(false);
     setCallingInProgress(true);
+    localStorage.setItem('callingInProgress', 'true');
     showMessage('info', 'Starting batch calls... This may take a few minutes.');
 
     try {
       const response = await triggerBatchCall(currentFile);
+      
+      // Check if there were no calls to make
+      if (response.results?.total_attempted === 0) {
+        showMessage('info', 'All eligible patients have already been called. Upload a new file or check existing patient data.');
+        setCallingInProgress(false);
+        localStorage.removeItem('callingInProgress');
+        return;
+      }
+      
       showMessage('success', response.message);
+      
+      // Calls are complete, but we'll refresh data to show updates
+      // Clear calling status after a short delay to allow user to see the success message
+      setTimeout(() => {
+        setCallingInProgress(false);
+        localStorage.removeItem('callingInProgress');
+      }, 2000);
       
       startAutoRefresh();
       setTimeout(() => loadPatientData(currentFile, true), 1000);
@@ -136,8 +179,8 @@ function App() {
       const err = error as { response?: { data?: { detail?: string } } };
       console.error('Batch call failed:', error);
       showMessage('error', err.response?.data?.detail || 'Batch call failed');
-    } finally {
       setCallingInProgress(false);
+      localStorage.removeItem('callingInProgress');
     }
   };
 
@@ -146,15 +189,20 @@ function App() {
       clearInterval(refreshIntervalRef.current);
     }
 
+    const fileToRefresh = currentFile;
     let count = 0;
     refreshIntervalRef.current = window.setInterval(() => {
-      if (currentFile && count < 40) {
-        loadPatientData(currentFile, true);
+      if (fileToRefresh && count < 40) {
+        loadPatientData(fileToRefresh, true);
         count++;
       } else {
         if (refreshIntervalRef.current) {
           clearInterval(refreshIntervalRef.current);
+          refreshIntervalRef.current = null;
         }
+        // Clear call status when refresh is done (after ~2 minutes)
+        setCallingInProgress(false);
+        localStorage.removeItem('callingInProgress');
       }
     }, 3000);
   };
@@ -172,6 +220,9 @@ function App() {
   const handleUploadNewFile = () => {
     setCurrentFile('');
     setPatients([]);
+    localStorage.removeItem('currentFile');
+    localStorage.removeItem('callingInProgress');
+    setCallingInProgress(false);
     if (refreshIntervalRef.current) {
       clearInterval(refreshIntervalRef.current);
       refreshIntervalRef.current = null;

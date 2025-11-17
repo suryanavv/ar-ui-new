@@ -8,3 +8,4 @@ export { PatientTable } from './PatientTable';
 export { ConfirmModal } from './ConfirmModal';
 export { NotesModal } from './NotesModal';
 export { LoginPage } from './LoginPage';
+export { Dashboard } from './Dashboard';

@@ -82,6 +82,8 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, ac
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Link Requested</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Link Sent</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Est. Date</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Call Status</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Calls</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Actions</th>
             </tr>
           </thead>
@@ -114,6 +116,26 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, ac
                   ) : (
                     <span className="text-gray-400">-</span>
                   )}
+                </td>
+                <td className="px-4 py-4 text-sm">
+                  {patient.call_status ? (
+                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+                      patient.call_status === 'completed' 
+                        ? 'bg-green-100 text-green-800' 
+                        : patient.call_status === 'failed'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {patient.call_status.charAt(0).toUpperCase() + patient.call_status.slice(1)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm">
+                  <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold">
+                    {patient.call_count || 0}
+                  </span>
                 </td>
                 <td className="px-4 py-4 text-sm">
                   <div className="flex items-center gap-2 flex-wrap">

@@ -15,6 +15,9 @@ export interface Patient {
   link_requested?: string;
   link_sent?: string;
   estimated_date?: string;
+  call_status?: string;
+  call_count?: number;
+  last_called_at?: string;
 }
 
 export interface CSVFile {

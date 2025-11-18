@@ -18,38 +18,6 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, ac
     // Consider call active if initiated within last 10 minutes
     return (now - timestamp) < 10 * 60 * 1000;
   };
-
-  // Check if patient only has "Call initiated" but no conversation
-  const shouldShowCallButton = (patient: Patient): boolean => {
-    if (!patient.notes || !onCallPatient || !patient.phone_number) return false;
-    
-    // Don't show call button if call is currently active (recently initiated)
-    if (isCallActive(patient.phone_number)) return false;
-    
-    const notes = patient.notes.toLowerCase();
-    
-    // Must have "call initiated" to show the button
-    const hasCallInitiated = notes.includes('call initiated');
-    if (!hasCallInitiated) return false;
-    
-    // Don't show if call failed (different from no conversation)
-    if (notes.includes('call failed')) return false;
-    
-    // Check if there's any conversation content (payment link, response, completed, etc.)
-    const hasConversation = notes.includes('payment link') || 
-                            notes.includes('link sent') ||
-                            notes.includes('call completed') || 
-                            notes.includes('conversation') ||
-                            notes.includes('patient responded') ||
-                            notes.includes('patient said') ||
-                            notes.includes('agreed to') ||
-                            notes.includes('declined') ||
-                            notes.includes('scheduled') ||
-                            (notes.length > 50 && hasCallInitiated); // If notes are long, likely has conversation
-    
-    // Show button if call was initiated but no conversation happened (and it's not a recent call)
-    return !hasConversation;
-  };
   if (loading) {
     return (
       <div className="text-center py-12 text-gray-600 font-medium text-lg">
@@ -84,6 +52,7 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, ac
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Est. Date</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Call Status</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Calls</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Payment Status</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Actions</th>
             </tr>
           </thead>
@@ -138,12 +107,29 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, ac
                   </span>
                 </td>
                 <td className="px-4 py-4 text-sm">
+                  {patient.payment_status ? (
+                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+                      patient.payment_status === 'completed' 
+                        ? 'bg-green-100 text-green-800' 
+                        : patient.payment_status === 'failed'
+                        ? 'bg-red-100 text-red-800'
+                        : patient.payment_status === 'refunded'
+                        ? 'bg-orange-100 text-orange-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {patient.payment_status.charAt(0).toUpperCase() + patient.payment_status.slice(1)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm">
                   <div className="flex items-center gap-2 flex-wrap">
-                    {shouldShowCallButton(patient) && onCallPatient && (
+                    {onCallPatient && patient.phone_number && !isCallActive(patient.phone_number) && (
                       <button
                         onClick={() => onCallPatient(patient)}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-teal-600 text-teal-600 rounded-lg text-xs font-semibold hover:bg-teal-50 transition-colors"
-                        title="Call patient again (call was initiated but no conversation)"
+                        title="Call patient"
                       >
                         <FiPhone size={14} />
                         Call

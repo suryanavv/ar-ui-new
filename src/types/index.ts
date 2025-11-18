@@ -18,6 +18,7 @@ export interface Patient {
   call_status?: string;
   call_count?: number;
   last_called_at?: string;
+  payment_status?: string; // pending, completed, failed, refunded
 }
 
 export interface CSVFile {

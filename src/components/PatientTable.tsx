@@ -41,11 +41,11 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, ac
         <table className="w-full">
           <thead className="border-b-2 border-teal-700">
             <tr>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Phone Number</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Patient Name</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Phone Number</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Invoice #</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Price</th>
-              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Outstanding</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Invoice amount</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Outstanding balance</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Aging</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Link Requested</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Link Sent</th>
@@ -59,8 +59,8 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, ac
           <tbody className="divide-y divide-gray-100">
             {patients.map((patient, index) => (
               <tr key={index} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-4 text-sm text-gray-900 font-medium">{patient.phone_number}</td>
                 <td className="px-4 py-4 text-sm text-gray-900">{patient.patient_name}</td>
+                <td className="px-4 py-4 text-sm text-gray-900 font-medium">{patient.phone_number}</td>
                 <td className="px-4 py-4 text-sm text-gray-700 font-mono">{patient.invoice_number}</td>
                 <td className="px-4 py-4 text-sm text-gray-900 font-semibold">{patient.price}</td>
                 <td className="px-4 py-4 text-sm text-red-600 font-bold">{patient.outstanding_amount}</td>

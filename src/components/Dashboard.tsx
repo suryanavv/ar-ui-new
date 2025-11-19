@@ -18,11 +18,26 @@ interface DashboardStats {
   total_files: number;
   aging_distribution: Array<{ bucket: string; count: number; total_amount: number }>;
   status_distribution: Array<{ status: string; count: number }>;
+  recent_calls_list: Array<{
+    patient_name: string;
+    phone_number: string;
+    invoice_number: string;
+    called_at: string | null;
+    call_status: string;
+    notes: string;
+  }>;
+  paid_patients: Array<{
+    patient_name: string;
+    invoice_number: string;
+    amount_paid: number;
+    payment_completed_at: string | null;
+  }>;
 }
 
 export const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showPaidPatientsModal, setShowPaidPatientsModal] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
   const loadStats = async () => {
@@ -98,6 +113,23 @@ export const Dashboard = () => {
     }).format(amount);
   };
 
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      }).format(date);
+    } catch {
+      return dateString;
+    }
+  };
+
   // Show empty state if no data
   if (isEmpty) {
     return (
@@ -171,11 +203,15 @@ export const Dashboard = () => {
 
         {/* Total Amount Paid */}
         {stats.total_amount_paid > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div 
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => setShowPaidPatientsModal(true)}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500 font-medium">Total Amount Paid</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(stats.total_amount_paid)}</p>
+                <p className="text-xs text-gray-500 mt-1">Click to view details</p>
               </div>
               <div className="p-3 bg-emerald-100 rounded-full">
                 <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -239,6 +275,38 @@ export const Dashboard = () => {
         </div>
       </div>
 
+      {/* Recent Calls Section */}
+      {stats.recent_calls_list && stats.recent_calls_list.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Calls</h3>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {stats.recent_calls_list.map((call, index) => (
+              <div key={index} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="text-sm font-semibold text-gray-900">{call.patient_name}</p>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      call.call_status === 'completed' 
+                        ? 'bg-green-100 text-green-800' 
+                        : call.call_status === 'failed'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {call.call_status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 mb-1">Invoice: {call.invoice_number} | Phone: {call.phone_number}</p>
+                  {call.notes && (
+                    <p className="text-xs text-gray-500 italic mt-1">{call.notes}</p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">{formatDateTime(call.called_at)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Distribution Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Aging Bucket Distribution */}
@@ -278,6 +346,59 @@ export const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Paid Patients Modal */}
+      {showPaidPatientsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowPaidPatientsModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">Paid Patients</h2>
+              <button
+                onClick={() => setShowPaidPatientsModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto flex-1">
+              {stats.paid_patients && stats.paid_patients.length > 0 ? (
+                <div className="space-y-3">
+                  {stats.paid_patients.map((patient, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-gray-900">{patient.patient_name}</p>
+                        <p className="text-xs text-gray-600 mt-1">Invoice: {patient.invoice_number}</p>
+                        {patient.payment_completed_at && (
+                          <p className="text-xs text-gray-500 mt-1">Paid on: {formatDateTime(patient.payment_completed_at)}</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-emerald-700">{formatCurrency(patient.amount_paid)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No paid patients found</p>
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600">
+                  Total: <span className="font-semibold text-gray-900">{stats.paid_patients?.length || 0} patients</span>
+                </p>
+                <p className="text-sm text-gray-600">
+                  Total Amount: <span className="font-semibold text-emerald-700">{formatCurrency(stats.total_amount_paid)}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

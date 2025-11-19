@@ -83,6 +83,20 @@ export const getDashboardStats = async (): Promise<{
   total_files: number;
   aging_distribution: Array<{ bucket: string; count: number; total_amount: number }>;
   status_distribution: Array<{ status: string; count: number }>;
+  recent_calls_list: Array<{
+    patient_name: string;
+    phone_number: string;
+    invoice_number: string;
+    called_at: string | null;
+    call_status: string;
+    notes: string;
+  }>;
+  paid_patients: Array<{
+    patient_name: string;
+    invoice_number: string;
+    amount_paid: number;
+    payment_completed_at: string | null;
+  }>;
 }> => {
   const response = await api.get('/dashboard/stats');
   return response.data;

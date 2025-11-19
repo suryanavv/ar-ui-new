@@ -271,10 +271,22 @@ function App() {
         setTimeout(() => loadPatientData(null, true), 1000);  // Load all from DB
       }
       
-      // Refresh dashboard stats after calls
+      // Refresh dashboard stats after calls and keep refreshing to catch updated summaries
       const refreshDashboard = (window as { refreshDashboard?: () => void }).refreshDashboard;
       if (refreshDashboard) {
-        setTimeout(() => refreshDashboard(), 2000);  // Refresh after 2 seconds
+        // Immediate refresh
+        setTimeout(() => refreshDashboard(), 2000);
+        
+        // Continue refreshing every 3 seconds for 30 seconds to catch updated call summaries
+        const refreshInterval = setInterval(() => {
+          if (refreshDashboard) {
+            refreshDashboard();
+          }
+        }, 3000);
+        
+        setTimeout(() => {
+          clearInterval(refreshInterval);
+        }, 30000);
       }
     } catch (error) {
       const err = error as { response?: { data?: { detail?: string } } };
@@ -392,7 +404,7 @@ function App() {
         localStorage.setItem('activeCalls', JSON.stringify(Array.from(newActiveCalls.entries())));
         
         showMessage('success', response.message || `Call initiated to ${patient.patient_name}`);
-        // Refresh patient data after a short delay to show updated notes
+        // Refresh patient data and dashboard after a short delay to show updated notes
         setTimeout(() => {
           loadPatientData(null, true, true);  // Load all from database
           // Refresh dashboard if on dashboard section
@@ -401,6 +413,18 @@ function App() {
             refreshDashboard();
           }
         }, 2000);
+        
+        // Also refresh dashboard periodically after call to catch updated summaries
+        const refreshInterval = setInterval(() => {
+          const refreshDashboard = (window as { refreshDashboard?: () => void }).refreshDashboard;
+          if (refreshDashboard && activeSection === 'dashboard') {
+            refreshDashboard();
+          }
+        }, 3000); // Refresh every 3 seconds for 30 seconds after call
+        
+        setTimeout(() => {
+          clearInterval(refreshInterval);
+        }, 30000);
       } else {
         showMessage('error', response.message || 'Failed to initiate call');
       }

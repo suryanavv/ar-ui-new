@@ -65,6 +65,31 @@ export const callPatient = async (phoneNumber: string): Promise<{ success: boole
   return response.data;
 };
 
+// Get call history for a patient
+export const getCallHistory = async (phoneNumber: string, invoiceNumber?: string): Promise<{
+  success: boolean;
+  patient_name: string;
+  invoice_number: string;
+  phone_number: string;
+  calls: Array<{
+    id: number;
+    patient_name: string;
+    phone_number: string;
+    invoice_number: string;
+    called_at: string | null;
+    call_status: string;
+    notes: string;
+  }>;
+  total_calls: number;
+}> => {
+  const params: { phone_number: string; invoice_number?: string } = { phone_number: phoneNumber };
+  if (invoiceNumber) {
+    params.invoice_number = invoiceNumber;
+  }
+  const response = await api.get('/call-history', { params });
+  return response.data;
+};
+
 // Get dashboard statistics
 export const getDashboardStats = async (): Promise<{
   total_invoices: number;

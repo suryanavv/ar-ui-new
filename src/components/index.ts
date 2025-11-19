@@ -7,5 +7,6 @@ export { DownloadButton } from './DownloadButton';
 export { PatientTable } from './PatientTable';
 export { ConfirmModal } from './ConfirmModal';
 export { NotesModal } from './NotesModal';
+export { CallHistoryModal } from './CallHistoryModal';
 export { LoginPage } from './LoginPage';
 export { Dashboard } from './Dashboard';

@@ -6,10 +6,11 @@ interface PatientTableProps {
   loading: boolean;
   onViewNotes: (patient: Patient) => void;
   onCallPatient?: (patient: Patient) => void;
+  onViewCallHistory?: (patient: Patient) => void;
   activeCalls?: Map<string, number>;
 }
 
-export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, activeCalls = new Map() }: PatientTableProps) => {
+export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, onViewCallHistory, activeCalls = new Map() }: PatientTableProps) => {
   // Check if call is currently active
   const isCallActive = (phoneNumber: string): boolean => {
     if (!activeCalls.has(phoneNumber)) return false;
@@ -68,6 +69,7 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, ac
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Est. Date</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Call Status</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Calls</th>
+              <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700 min-w-[200px]">Recent Call Notes</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Payment Status</th>
               <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-teal-700">Actions</th>
             </tr>
@@ -127,9 +129,30 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, ac
                   )}
                 </td>
                 <td className="px-4 py-4 text-sm">
-                  <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold">
-                    {patient.call_count || 0}
-                  </span>
+                  {patient.call_count && patient.call_count > 0 ? (
+                    <button
+                      onClick={() => onViewCallHistory && onViewCallHistory(patient)}
+                      className="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
+                      title="Click to view call history"
+                    >
+                      {patient.call_count}
+                    </button>
+                  ) : (
+                    <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold">
+                      {patient.call_count || 0}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm min-w-[200px] max-w-md">
+                  {patient.recent_call_notes && patient.recent_call_notes.trim() ? (
+                    <div className="group relative">
+                      <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                        {patient.recent_call_notes}
+                      </p>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 text-xs">No notes</span>
+                  )}
                 </td>
                 <td className="px-4 py-4 text-sm">
                   {patient.payment_status ? (

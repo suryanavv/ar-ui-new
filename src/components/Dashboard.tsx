@@ -297,7 +297,7 @@ export const Dashboard = () => {
                   </div>
                   <p className="text-xs text-gray-600 mb-1">Invoice: {call.invoice_number} | Phone: {call.phone_number}</p>
                   {call.notes && (
-                    <p className="text-xs text-gray-500 italic mt-1">{call.notes}</p>
+                    <p className="text-xs text-gray-500 italic mt-1 whitespace-pre-wrap break-words">{call.notes}</p>
                   )}
                   <p className="text-xs text-gray-400 mt-1">{formatDateTime(call.called_at)}</p>
                 </div>

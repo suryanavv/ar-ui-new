@@ -9,6 +9,7 @@ import {
   PatientTable,
   ConfirmModal,
   NotesModal,
+  CallHistoryModal,
   LoginPage,
   Dashboard
 } from './components';
@@ -33,6 +34,7 @@ function App() {
   const [callingInProgress, setCallingInProgress] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
+  const [showCallHistoryModal, setShowCallHistoryModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [activeCalls, setActiveCalls] = useState<Map<string, number>>(new Map()); // phone_number -> timestamp
   const refreshIntervalRef = useRef<number | null>(null);
@@ -374,6 +376,11 @@ function App() {
     setShowNotesModal(true);
   };
 
+  const handleViewCallHistory = (patient: Patient) => {
+    setSelectedPatient(patient);
+    setShowCallHistoryModal(true);
+  };
+
   const handleCallPatient = async (patient: Patient) => {
     if (!patient.phone_number) {
       showMessage('error', 'Phone number not available');
@@ -583,6 +590,7 @@ function App() {
           loading={loading} 
           onViewNotes={handleViewNotes}
           onCallPatient={handleCallPatient}
+          onViewCallHistory={handleViewCallHistory}
           activeCalls={activeCalls}
         />
           </div>
@@ -602,6 +610,14 @@ function App() {
           patientName={selectedPatient?.patient_name || ''}
           notes={selectedPatient?.notes || ''}
           onClose={() => setShowNotesModal(false)}
+        />
+
+        <CallHistoryModal
+          isOpen={showCallHistoryModal}
+          patientName={selectedPatient?.patient_name || ''}
+          phoneNumber={selectedPatient?.phone_number || ''}
+          invoiceNumber={selectedPatient?.invoice_number || ''}
+          onClose={() => setShowCallHistoryModal(false)}
         />
       </div>
     </div>

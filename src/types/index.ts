@@ -20,6 +20,7 @@ export interface Patient {
   last_called_at?: string;
   payment_status?: string; // pending, completed, failed, refunded
   amount_paid?: string; // Amount paid by patient
+  recent_call_notes?: string; // Most recent call notes from call history
 }
 
 export interface CSVFile {

@@ -25,6 +25,13 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
     return patient.payment_status === 'completed' && parseFloat(patient.amount_paid || '0') > 0;
   };
 
+  // Check if patient has outstanding balance
+  const hasOutstandingBalance = (patient: Patient): boolean => {
+    if (isPaid(patient)) return false;
+    const outstanding = parseFloat(patient.outstanding_amount?.toString() || '0');
+    return outstanding > 0;
+  };
+
   const formatCurrency = (amount: string | number): string => {
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
     return new Intl.NumberFormat('en-US', {
@@ -187,7 +194,7 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                 </td>
                 <td className="px-4 py-4 text-sm">
                   <div className="flex items-center gap-2 flex-wrap">
-                    {!isPaid(patient) && onCallPatient && patient.phone_number && !isCallActive(patient.phone_number) && (
+                    {hasOutstandingBalance(patient) && onCallPatient && patient.phone_number && !isCallActive(patient.phone_number) && (
                       <button
                         onClick={() => onCallPatient(patient)}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-teal-600 text-teal-600 rounded-lg text-xs font-semibold hover:bg-teal-50 transition-colors"

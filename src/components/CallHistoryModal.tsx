@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FiX, FiPhone, FiClock } from 'react-icons/fi';
 import { getCallHistory } from '../services/api';
 import { formatDateTime } from '../utils/timezone';
@@ -26,13 +26,11 @@ export const CallHistoryModal = ({ isOpen, patientName, phoneNumber, invoiceNumb
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen && phoneNumber) {
-      loadCallHistory();
+  const loadCallHistory = useCallback(async () => {
+    if (!phoneNumber || !invoiceNumber) {
+      return;
     }
-  }, [isOpen, phoneNumber, invoiceNumber]);
-
-  const loadCallHistory = async () => {
+    
     setLoading(true);
     setError(null);
     try {
@@ -45,7 +43,20 @@ export const CallHistoryModal = ({ isOpen, patientName, phoneNumber, invoiceNumb
     } finally {
       setLoading(false);
     }
-  };
+  }, [phoneNumber, invoiceNumber]);
+
+  useEffect(() => {
+    if (isOpen && phoneNumber && invoiceNumber) {
+      // Reset state when modal opens
+      setCalls([]);
+      setError(null);
+      loadCallHistory();
+    } else if (!isOpen) {
+      // Reset state when modal closes
+      setCalls([]);
+      setError(null);
+    }
+  }, [isOpen, phoneNumber, invoiceNumber, patientName, loadCallHistory]);
 
 
   if (!isOpen) return null;

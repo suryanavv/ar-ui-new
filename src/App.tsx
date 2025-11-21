@@ -12,7 +12,9 @@ import {
   CallHistoryModal,
   LoginPage,
   Dashboard,
-  InvoiceList
+  InvoiceList,
+  ToastContainer,
+  useToast
 } from './components';
 import { uploadCSV, getCSVData, getAllPatients, getAvailableFiles, triggerBatchCall, callPatient } from './services/api';
 import type { Patient, Message, User } from './types';
@@ -34,11 +36,14 @@ function App() {
   const [message, setMessage] = useState<Message | null>(null);
   const [callingInProgress, setCallingInProgress] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showCallConfirmModal, setShowCallConfirmModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showCallHistoryModal, setShowCallHistoryModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [patientToCall, setPatientToCall] = useState<Patient | null>(null);
   const [activeCalls, setActiveCalls] = useState<Map<string, number>>(new Map()); // phone_number -> timestamp
   const refreshIntervalRef = useRef<number | null>(null);
+  const { toasts, showToast, removeToast } = useToast();
 
   // Check if user is already logged in on mount
   useEffect(() => {
@@ -203,7 +208,7 @@ function App() {
         
         // If there are errors, also show them
         if (errorCount > 0) {
-          const errorDetails = response.errors?.slice(0, 3).map((e: any) => {
+          const errorDetails = response.errors?.slice(0, 3).map((e: { patient_name?: string; invoice_number?: string; error?: string }) => {
             const patient = e.patient_name || 'Unknown';
             const invoice = e.invoice_number || '';
             const error = e.error || 'Unknown error';
@@ -428,11 +433,26 @@ function App() {
     setShowCallHistoryModal(true);
   };
 
-  const handleCallPatient = async (patient: Patient) => {
+  const handleCallPatient = (patient: Patient) => {
     if (!patient.phone_number) {
       showMessage('error', 'Phone number not available');
       return;
     }
+    
+    // Show confirmation modal first
+    setPatientToCall(patient);
+    setShowCallConfirmModal(true);
+  };
+
+  const confirmCallPatient = async () => {
+    if (!patientToCall) {
+      setShowCallConfirmModal(false);
+      return;
+    }
+
+    const patient = patientToCall;
+    setShowCallConfirmModal(false);
+    setPatientToCall(null);
 
     try {
       showMessage('info', `Calling ${patient.patient_name} at ${patient.phone_number}...`);
@@ -446,13 +466,16 @@ function App() {
         localStorage.setItem('activeCalls', JSON.stringify(Array.from(newActiveCalls.entries())));
         
         showMessage('success', response.message || `Call initiated to ${patient.patient_name}`);
-        // Silently refresh patient table to show updated data
+        showToast('success', `Call initiated to ${patient.patient_name}`);
+        
+        // Refresh patient table to show updated call status
         if (activeSection === 'upload') {
-          loadPatientData(null, true, true);  // Load all from database silently
+          // Immediate refresh
+          loadPatientData(null, true, true);
           
           // Also refresh periodically to catch updated call summaries (silent)
           let refreshCount = 0;
-          const maxRefreshes = 10; // Refresh 10 times over 30 seconds
+          const maxRefreshes = 15; // Refresh 15 times over 45 seconds to catch summary updates
           const refreshInterval = setInterval(() => {
             if (activeSection === 'upload' && refreshCount < maxRefreshes) {
               loadPatientData(null, true, true);  // Silent refresh
@@ -464,11 +487,13 @@ function App() {
         }
       } else {
         showMessage('error', response.message || 'Failed to initiate call');
+        showToast('error', response.message || 'Failed to initiate call');
       }
     } catch (error) {
       const err = error as { response?: { data?: { detail?: string } } };
       console.error('Call failed:', error);
       showMessage('error', err.response?.data?.detail || 'Failed to call patient');
+      showToast('error', err.response?.data?.detail || 'Failed to call patient');
     }
   };
 
@@ -494,6 +519,7 @@ function App() {
       <div className="max-w-[1920px] mx-auto px-8 py-6 relative z-0">
 
         {message && <MessageAlert message={message} />}
+        <ToastContainer toasts={toasts} onRemove={removeToast} />
 
         {/* Top Navigation Bar */}
         <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200">
@@ -677,10 +703,21 @@ function App() {
 
         <ConfirmModal
           isOpen={showConfirmModal}
-          title="Start Calls"
-          message={`Are you sure you want to start calling ${patients.length} patients?`}
+          title="Start Batch Calls"
+          message={`You are about to initiate calls to ${patients.length} patient${patients.length !== 1 ? 's' : ''}. Calls will be made automatically and summaries will be generated after each call completes.`}
           onConfirm={confirmBatchCall}
           onCancel={() => setShowConfirmModal(false)}
+        />
+
+        <ConfirmModal
+          isOpen={showCallConfirmModal}
+          title="Call Patient"
+          message={`Are you sure you want to call ${patientToCall?.patient_name || 'this patient'} at ${patientToCall?.phone_number || ''}?`}
+          onConfirm={confirmCallPatient}
+          onCancel={() => {
+            setShowCallConfirmModal(false);
+            setPatientToCall(null);
+          }}
         />
 
         <NotesModal

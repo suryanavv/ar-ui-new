@@ -11,13 +11,15 @@ interface PatientTableProps {
 }
 
 export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, onViewCallHistory, activeCalls = new Map() }: PatientTableProps) => {
-  // Check if call is currently active
+  // Check if call is currently active (only for the first 5 minutes after initiation)
+  // This allows users to call again after the call completes
   const isCallActive = (phoneNumber: string): boolean => {
     if (!activeCalls.has(phoneNumber)) return false;
     const timestamp = activeCalls.get(phoneNumber)!;
     const now = Date.now();
-    // Consider call active if initiated within last 10 minutes
-    return (now - timestamp) < 10 * 60 * 1000;
+    // Consider call active only if initiated within last 5 minutes
+    // After that, allow calling again (call likely completed)
+    return (now - timestamp) < 5 * 60 * 1000;
   };
 
   // Check if invoice is paid (payment_status is completed)
@@ -150,19 +152,19 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                   )}
                 </td>
                 <td className="px-4 py-4 text-sm">
-                  {patient.call_count && patient.call_count > 0 ? (
-                    <button
-                      onClick={() => onViewCallHistory && onViewCallHistory(patient)}
-                      className="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
-                      title="Click to view call history"
-                    >
-                      {patient.call_count}
-                    </button>
-                  ) : (
-                    <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold">
-                      {patient.call_count || 0}
-                    </span>
-                  )}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (onViewCallHistory) {
+                        onViewCallHistory(patient);
+                      }
+                    }}
+                    className="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
+                    title={`Click to view call history for ${patient.patient_name} - Invoice ${patient.invoice_number}`}
+                  >
+                    {patient.call_count || 0}
+                  </button>
                 </td>
                 <td className="px-4 py-4 text-sm min-w-[200px] max-w-md">
                   {patient.recent_call_notes && patient.recent_call_notes.trim() ? (
@@ -194,15 +196,26 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                 </td>
                 <td className="px-4 py-4 text-sm">
                   <div className="flex items-center gap-2 flex-wrap">
-                    {hasOutstandingBalance(patient) && onCallPatient && patient.phone_number && !isCallActive(patient.phone_number) && (
-                      <button
-                        onClick={() => onCallPatient(patient)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-teal-600 text-teal-600 rounded-lg text-xs font-semibold hover:bg-teal-50 transition-colors"
-                        title="Call patient"
-                      >
-                        <FiPhone size={14} />
-                        Call
-                      </button>
+                    {hasOutstandingBalance(patient) && onCallPatient && patient.phone_number && (
+                      isCallActive(patient.phone_number) ? (
+                        <button
+                          disabled
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-400 rounded-lg text-xs font-semibold cursor-not-allowed"
+                          title="Call in progress..."
+                        >
+                          <FiPhone size={14} />
+                          Calling...
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onCallPatient(patient)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-teal-600 text-teal-600 rounded-lg text-xs font-semibold hover:bg-teal-50 transition-colors"
+                          title="Call patient"
+                        >
+                          <FiPhone size={14} />
+                          Call
+                        </button>
+                      )
                     )}
                     <button
                       onClick={() => onViewNotes(patient)}

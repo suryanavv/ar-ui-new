@@ -41,8 +41,25 @@ export const getAllPatients = async (sourceFilename?: string): Promise<{ success
 
 // Get list of available CSV files
 export const getAvailableFiles = async (): Promise<{ success: boolean; files: string[]; count: number }> => {
-  const response = await api.get('/files');
-  return response.data;
+  // Use /files/list and extract unique filenames
+  interface FileUploadItem {
+    id: number;
+    filename: string;
+    uploaded_at: string | null;
+    patient_count: number;
+    new_count: number;
+    updated_count: number;
+    error_count: number;
+    created_at: string | null;
+  }
+  const response = await api.get<{ success: boolean; history: FileUploadItem[]; count: number }>('/files/list');
+  const history = response.data.history || [];
+  const uniqueFiles: string[] = Array.from(new Set(history.map((item: FileUploadItem) => item.filename).filter((f): f is string => Boolean(f))));
+  return {
+    success: response.data.success,
+    files: uniqueFiles,
+    count: uniqueFiles.length
+  };
 };
 
 // Trigger batch calls (csvFilename is optional, now uses database)
@@ -136,7 +153,8 @@ export const getFileListWithDates = async (): Promise<{ success: boolean; files:
 
 // Get file upload history
 export const getFileUploadHistory = async (): Promise<{ success: boolean; history: Array<{ id: number; filename: string; uploaded_at: string | null; patient_count: number; new_count: number; updated_count: number; error_count: number; created_at: string | null }>; count: number }> => {
-  const response = await api.get('/files/history');
+  // Use /files/list which returns history
+  const response = await api.get('/files/list');
   return response.data;
 };
 

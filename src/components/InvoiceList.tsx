@@ -125,7 +125,11 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
 
       showMessage('info', `Calling ${patientToCall.patient_name || 'patient'}...`);
       
-      const result = await callPatient(phoneNumber);
+      const result = await callPatient(
+        phoneNumber, 
+        patientToCall.invoice_number, 
+        patientToCall.patient_name
+      );
       
       if (result.success) {
         showMessage('success', `Call initiated to ${patientToCall.patient_name || 'patient'}`);

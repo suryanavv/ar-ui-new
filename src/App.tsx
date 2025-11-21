@@ -456,7 +456,11 @@ function App() {
 
     try {
       showMessage('info', `Calling ${patient.patient_name} at ${patient.phone_number}...`);
-      const response = await callPatient(patient.phone_number);
+      const response = await callPatient(
+        patient.phone_number,
+        patient.invoice_number,
+        patient.patient_name
+      );
       
       if (response.success) {
         // Track this call as active

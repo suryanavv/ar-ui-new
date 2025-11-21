@@ -77,8 +77,25 @@ export const triggerBatchCall = async (
 };
 
 // Call a single patient by phone number
-export const callPatient = async (phoneNumber: string): Promise<{ success: boolean; message: string }> => {
-  const response = await api.post(`/call-patient/${phoneNumber}`);
+export const callPatient = async (
+  phoneNumber: string, 
+  invoiceNumber?: string, 
+  patientName?: string
+): Promise<{ 
+  success: boolean; 
+  message: string;
+  patient_name?: string;
+  invoice_number?: string;
+  outstanding_amount?: string;
+  conversation_id?: string;
+}> => {
+  const params: { invoice_number?: string; patient_name?: string } = {};
+  if (invoiceNumber) params.invoice_number = invoiceNumber;
+  if (patientName) params.patient_name = patientName;
+  
+  const response = await api.post(`/call-patient/${phoneNumber}`, null, {
+    params
+  });
   return response.data;
 };
 

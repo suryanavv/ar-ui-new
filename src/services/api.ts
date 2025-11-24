@@ -198,4 +198,25 @@ export const getCallsByDate = async (startDate?: string, endDate?: string): Prom
   return response.data;
 };
 
+// Get call status for specific phone numbers (lightweight endpoint)
+export const getCallStatus = async (phoneNumbers: string[]): Promise<{
+  success: boolean;
+  statuses: Array<{
+    phone_number: string;
+    invoice_number: string | null;
+    call_status: string | null;
+    last_called_at: string | null;
+    recent_call_status: string | null;
+    recent_call_at: string | null;
+  }>;
+}> => {
+  if (phoneNumbers.length === 0) {
+    return { success: true, statuses: [] };
+  }
+  const response = await api.get('/call-status', {
+    params: { phone_numbers: phoneNumbers.join(',') }
+  });
+  return response.data;
+};
+
 export default api;

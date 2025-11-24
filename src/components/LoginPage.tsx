@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { FiMail, FiLock, FiAlertCircle } from 'react-icons/fi';
 import logo from '../assets/favicon-32x32.png';
+import type { User } from '../types';
 
 interface LoginPageProps {
-  onLogin: (token: string, user: any) => void;
+  onLogin: (token: string, user: User) => void;
 }
 
 export const LoginPage = ({ onLogin }: LoginPageProps) => {
@@ -40,8 +41,8 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
       
       // Call parent callback
       onLogin(data.access_token, data.user);
-    } catch (err: any) {
-      setError(err.message || 'Invalid email or password');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Invalid email or password');
     } finally {
       setLoading(false);
     }

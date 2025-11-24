@@ -82,8 +82,19 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
   };
 
   const handleViewCallHistory = (patient: Patient) => {
-    if (!patient || !patient.phone_number || !patient.invoice_number) {
-      showMessage('error', `Cannot view call history: Missing ${!patient ? 'patient' : !patient.phone_number ? 'phone number' : 'invoice number'}`);
+    if (!patient) {
+      showMessage('error', 'Cannot view call history: Patient information is missing');
+      return;
+    }
+    const phone = patient.phone_number && patient.phone_number.toLowerCase() !== 'nan' ? patient.phone_number : '';
+    const invoice = patient.invoice_number && patient.invoice_number.toLowerCase() !== 'nan' ? patient.invoice_number : '';
+    
+    if (!phone) {
+      showMessage('error', 'Cannot view call history: Phone number is missing or invalid');
+      return;
+    }
+    if (!invoice) {
+      showMessage('error', 'Cannot view call history: Invoice number is missing');
       return;
     }
     setSelectedPatient(patient);
@@ -96,8 +107,15 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
   };
 
   const handleCallPatient = (patient: Patient) => {
-    if (!patient.phone_number) {
-      showMessage('error', 'Phone number not available');
+    const phone = patient.phone_number && patient.phone_number.toLowerCase() !== 'nan' ? patient.phone_number : '';
+    const invoice = patient.invoice_number && patient.invoice_number.toLowerCase() !== 'nan' ? patient.invoice_number : '';
+    
+    if (!phone || phone.length < 10) {
+      showMessage('error', 'Cannot make call: Phone number is missing or invalid (minimum 10 digits required)');
+      return;
+    }
+    if (!invoice) {
+      showMessage('error', 'Cannot make call: Invoice number is missing (required for identification)');
       return;
     }
     

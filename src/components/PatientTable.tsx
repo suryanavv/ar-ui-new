@@ -42,6 +42,19 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
       minimumFractionDigits: 2
     }).format(numAmount);
   };
+
+  // Check if patient has missing data
+  const hasMissingData = (patient: Patient): boolean => {
+    const phone = patient.phone_number && patient.phone_number.toLowerCase() !== 'nan' && patient.phone_number.length >= 10;
+    const invoice = patient.invoice_number && patient.invoice_number.toLowerCase() !== 'nan' && patient.invoice_number !== '';
+    const name = patient.patient_name && patient.patient_name.toLowerCase() !== 'nan' && patient.patient_name !== '';
+    return !phone || !invoice || !name;
+  };
+
+  // Separate patients into complete and missing records
+  const completePatients = patients.filter(p => !hasMissingData(p));
+  const missingPatients = patients.filter(p => hasMissingData(p));
+
   if (loading) {
     return (
       <div className="text-center py-12 text-gray-600 font-medium text-lg">
@@ -83,11 +96,32 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {patients.map((patient, index) => (
-              <tr key={index} className="hover:bg-gray-50 transition-colors">
-                <td className="px-4 py-4 text-sm text-gray-900">{patient.patient_name}</td>
-                <td className="px-4 py-4 text-sm text-gray-900 font-medium">{patient.phone_number}</td>
-                <td className="px-4 py-4 text-sm text-gray-700 font-mono">{patient.invoice_number}</td>
+            {/* Complete Records */}
+            {completePatients.map((patient, index) => (
+              <tr key={`complete-${index}`} className="hover:bg-gray-50 transition-colors">
+                <td className="px-4 py-4 text-sm text-gray-900">
+                  {patient.patient_name && patient.patient_name.toLowerCase() !== 'nan' ? (
+                    patient.patient_name
+                  ) : (
+                    <span className="text-red-500 italic" title="Patient name is missing">Missing</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm text-gray-900 font-medium">
+                  {patient.phone_number && patient.phone_number.toLowerCase() !== 'nan' && patient.phone_number.length >= 10 ? (
+                    patient.phone_number
+                  ) : (
+                    <span className="text-red-500 italic font-semibold" title="Phone number is missing or invalid - cannot make calls without a valid phone number">
+                      Missing Phone
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm text-gray-700 font-mono">
+                  {patient.invoice_number && patient.invoice_number.toLowerCase() !== 'nan' ? (
+                    patient.invoice_number
+                  ) : (
+                    <span className="text-red-500 italic" title="Invoice number is missing - required for identification">Missing</span>
+                  )}
+                </td>
                 <td className="px-4 py-4 text-sm text-gray-700">
                   {patient.invoice_date ? (
                     new Date(patient.invoice_date).toLocaleDateString('en-US', {
@@ -196,8 +230,35 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                 </td>
                 <td className="px-4 py-4 text-sm">
                   <div className="flex items-center gap-2 flex-wrap">
-                    {hasOutstandingBalance(patient) && onCallPatient && patient.phone_number && (
-                      isCallActive(patient.phone_number) ? (
+                    {hasOutstandingBalance(patient) && onCallPatient && (
+                      !patient.phone_number || patient.phone_number.toLowerCase() === 'nan' || patient.phone_number.length < 10 ? (
+                        <button
+                          disabled
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-300 text-red-500 rounded-lg text-xs font-semibold cursor-not-allowed bg-red-50"
+                          title="Phone number is missing or invalid - cannot make call without a valid phone number (minimum 10 digits)"
+                        >
+                          <FiPhone size={14} />
+                          Missing Phone
+                        </button>
+                      ) : !patient.invoice_number || patient.invoice_number.toLowerCase() === 'nan' ? (
+                        <button
+                          disabled
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-300 text-red-500 rounded-lg text-xs font-semibold cursor-not-allowed bg-red-50"
+                          title="Invoice number is missing - cannot make call without invoice number for identification"
+                        >
+                          <FiPhone size={14} />
+                          Missing Invoice
+                        </button>
+                      ) : !patient.patient_name || patient.patient_name.toLowerCase() === 'nan' ? (
+                        <button
+                          disabled
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-300 text-red-500 rounded-lg text-xs font-semibold cursor-not-allowed bg-red-50"
+                          title="Patient name is missing - cannot make call without patient name for identification"
+                        >
+                          <FiPhone size={14} />
+                          Missing Name
+                        </button>
+                      ) : isCallActive(patient.phone_number) ? (
                         <button
                           disabled
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-400 rounded-lg text-xs font-semibold cursor-not-allowed"
@@ -217,13 +278,222 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                         </button>
                       )
                     )}
-                    <button
-                      onClick={() => onViewNotes(patient)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-teal-600 text-teal-600 rounded-lg text-xs font-semibold hover:bg-teal-50 transition-colors"
-                    >
-                      <FiEye size={14} />
-                      View Notes
-                    </button>
+                    {(patient.call_count || 0) > 0 && (
+                      <button
+                        onClick={() => onViewNotes(patient)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-teal-600 text-teal-600 rounded-lg text-xs font-semibold hover:bg-teal-50 transition-colors"
+                        title="View notes (only available after calls have been made)"
+                      >
+                        <FiEye size={14} />
+                        View Notes
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+
+            {/* Teal Separator Line */}
+            {completePatients.length > 0 && missingPatients.length > 0 && (
+              <tr>
+                <td colSpan={15} className="px-0 py-0">
+                  <div className="h-px bg-teal-700 w-full mx-auto"></div>
+                </td>
+              </tr>
+            )}
+
+            {/* Missing Records */}
+            {missingPatients.map((patient, index) => (
+              <tr key={`missing-${index}`} className="hover:bg-gray-50 transition-colors bg-red-50/30">
+                <td className="px-4 py-4 text-sm text-gray-900">
+                  {patient.patient_name && patient.patient_name.toLowerCase() !== 'nan' && patient.patient_name !== '' ? (
+                    patient.patient_name
+                  ) : (
+                    <span className="text-red-500 italic font-semibold" title="Patient name is missing">Missing</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm text-gray-900 font-medium">
+                  {patient.phone_number && patient.phone_number.toLowerCase() !== 'nan' && patient.phone_number.length >= 10 ? (
+                    patient.phone_number
+                  ) : (
+                    <span className="text-red-500 italic font-semibold" title="Phone number is missing or invalid - cannot make calls without a valid phone number">
+                      Missing Phone
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm text-gray-700 font-mono">
+                  {patient.invoice_number && patient.invoice_number.toLowerCase() !== 'nan' && patient.invoice_number !== '' ? (
+                    patient.invoice_number
+                  ) : (
+                    <span className="text-red-500 italic font-semibold" title="Invoice number is missing - required for identification">Missing</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm text-gray-700">
+                  {patient.invoice_date ? (
+                    new Date(patient.invoice_date).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm text-gray-900 font-semibold">{patient.price}</td>
+                <td className="px-4 py-4 text-sm">
+                  {isPaid(patient) ? (
+                    <div className="flex flex-col">
+                      <span className="text-emerald-600 font-bold">Paid</span>
+                      <span className="text-xs text-gray-600 mt-1">
+                        Amount: {formatCurrency(patient.amount_paid || '0')}
+                      </span>
+                    </div>
+                  ) : patient.outstanding_amount && patient.outstanding_amount !== '' ? (
+                    <span className="text-red-600 font-bold">{patient.outstanding_amount}</span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm text-gray-700">{patient.aging_bucket}</td>
+                <td className="px-4 py-4 text-sm">
+                  {patient.link_requested ? (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-md text-xs font-medium">{patient.link_requested}</span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm">
+                  {patient.link_sent ? (
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded-md text-xs font-medium">{patient.link_sent}</span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm">
+                  {patient.estimated_date ? (
+                    <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-md text-xs font-medium">{patient.estimated_date}</span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm">
+                  {patient.call_status ? (
+                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+                      patient.call_status === 'completed' 
+                        ? 'bg-green-100 text-green-800' 
+                        : patient.call_status === 'failed'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {patient.call_status.charAt(0).toUpperCase() + patient.call_status.slice(1)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm">
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (onViewCallHistory) {
+                        onViewCallHistory(patient);
+                      }
+                    }}
+                    className="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
+                    title={`Click to view call history for ${patient.patient_name || 'patient'} - Invoice ${patient.invoice_number || 'N/A'}`}
+                  >
+                    {patient.call_count || 0}
+                  </button>
+                </td>
+                <td className="px-4 py-4 text-sm min-w-[200px] max-w-md">
+                  {patient.recent_call_notes && patient.recent_call_notes.trim() ? (
+                    <div className="group relative">
+                      <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
+                        {patient.recent_call_notes}
+                      </p>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 text-xs">No notes</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm">
+                  {patient.payment_status ? (
+                    <span className={`px-2 py-1 rounded-md text-xs font-medium ${
+                      patient.payment_status === 'completed' 
+                        ? 'bg-green-100 text-green-800' 
+                        : patient.payment_status === 'failed'
+                        ? 'bg-red-100 text-red-800'
+                        : patient.payment_status === 'refunded'
+                        ? 'bg-orange-100 text-orange-800'
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {patient.payment_status.charAt(0).toUpperCase() + patient.payment_status.slice(1)}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-sm">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {hasOutstandingBalance(patient) && onCallPatient && (
+                      !patient.phone_number || patient.phone_number.toLowerCase() === 'nan' || patient.phone_number.length < 10 ? (
+                        <button
+                          disabled
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-300 text-red-500 rounded-lg text-xs font-semibold cursor-not-allowed bg-red-50"
+                          title="Phone number is missing or invalid - cannot make call without a valid phone number (minimum 10 digits)"
+                        >
+                          <FiPhone size={14} />
+                          Missing Phone
+                        </button>
+                      ) : !patient.invoice_number || patient.invoice_number.toLowerCase() === 'nan' ? (
+                        <button
+                          disabled
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-300 text-red-500 rounded-lg text-xs font-semibold cursor-not-allowed bg-red-50"
+                          title="Invoice number is missing - cannot make call without invoice number for identification"
+                        >
+                          <FiPhone size={14} />
+                          Missing Invoice
+                        </button>
+                      ) : !patient.patient_name || patient.patient_name.toLowerCase() === 'nan' ? (
+                        <button
+                          disabled
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-red-300 text-red-500 rounded-lg text-xs font-semibold cursor-not-allowed bg-red-50"
+                          title="Patient name is missing - cannot make call without patient name for identification"
+                        >
+                          <FiPhone size={14} />
+                          Missing Name
+                        </button>
+                      ) : isCallActive(patient.phone_number) ? (
+                        <button
+                          disabled
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-400 rounded-lg text-xs font-semibold cursor-not-allowed"
+                          title="Call in progress..."
+                        >
+                          <FiPhone size={14} />
+                          Calling...
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onCallPatient(patient)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-teal-600 text-teal-600 rounded-lg text-xs font-semibold hover:bg-teal-50 transition-colors"
+                          title="Call patient"
+                        >
+                          <FiPhone size={14} />
+                          Call
+                        </button>
+                      )
+                    )}
+                    {(patient.call_count || 0) > 0 && (
+                      <button
+                        onClick={() => onViewNotes(patient)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-teal-600 text-teal-600 rounded-lg text-xs font-semibold hover:bg-teal-50 transition-colors"
+                        title="View notes (only available after calls have been made)"
+                      >
+                        <FiEye size={14} />
+                        View Notes
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

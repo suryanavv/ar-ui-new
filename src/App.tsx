@@ -16,7 +16,7 @@ import {
   ToastContainer,
   useToast
 } from './components';
-import { uploadCSV, getCSVData, getAllPatients, getAvailableFiles, triggerBatchCall, callPatient } from './services/api';
+import { uploadCSV, getCSVData, getAllPatients, getAvailableFiles, triggerBatchCall, callPatient, getCallStatus, getFileUploadHistory, getPatientsByUploadId } from './services/api';
 import type { Patient, Message, User } from './types';
 
 function App() {
@@ -42,7 +42,9 @@ function App() {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [patientToCall, setPatientToCall] = useState<Patient | null>(null);
   const [activeCalls, setActiveCalls] = useState<Map<string, number>>(new Map()); // phone_number -> timestamp
+  const activeCallsRef = useRef<Map<string, number>>(new Map()); // Ref to track active calls for refresh logic
   const refreshIntervalRef = useRef<number | null>(null);
+  const patientsRef = useRef<Patient[]>([]); // Ref to track patients for refresh logic
   const { toasts, showToast, removeToast } = useToast();
 
   // Check if user is already logged in on mount
@@ -55,37 +57,19 @@ function App() {
       setUser(JSON.parse(storedUser));
     }
     
-    // Restore call status from localStorage
-    const storedCallStatus = localStorage.getItem('callingInProgress');
+    // Restore current file from localStorage (but not call status - fetch fresh from server)
     const storedCurrentFile = localStorage.getItem('currentFile');
-    const storedActiveCalls = localStorage.getItem('activeCalls');
-    
-    if (storedCallStatus === 'true' && storedCurrentFile) {
-      setCallingInProgress(true);
-      setCurrentFile(storedCurrentFile);
-    } else if (storedCurrentFile) {
+    if (storedCurrentFile) {
       setCurrentFile(storedCurrentFile);
     }
     
-    // Restore active calls from localStorage
-    if (storedActiveCalls) {
-      try {
-        const activeCallsData = JSON.parse(storedActiveCalls);
-        const now = Date.now();
-        const activeCallsMap = new Map<string, number>();
-        
-        // Only restore calls that are less than 10 minutes old
-        activeCallsData.forEach(([phone, timestamp]: [string, number]) => {
-          if (now - timestamp < 10 * 60 * 1000) { // 10 minutes
-            activeCallsMap.set(phone, timestamp);
-          }
-        });
-        
-        setActiveCalls(activeCallsMap);
-      } catch (e) {
-        console.error('Failed to restore active calls:', e);
-      }
-    }
+    // Don't restore callingInProgress from localStorage - always fetch fresh status from server
+    // Clear any stale calling status
+    localStorage.removeItem('callingInProgress');
+    
+    // Don't restore active calls from localStorage - they may be stale
+    // Clear any stale active calls
+    localStorage.removeItem('activeCalls');
     
     setCheckingAuth(false);
   }, []);
@@ -96,16 +80,10 @@ function App() {
       loadAvailableFiles();  // Load list of available files
       // Only load patient data if we're in upload section
       if (activeSection === 'upload') {
-        loadPatientData(null, false, true);  // Load all from database
+        loadPatientData(null, false, true);  // Load all from database - get fresh status
       }
-      // Resume auto-refresh if call was in progress (only for upload section)
-      const storedCallStatus = localStorage.getItem('callingInProgress');
-      if (storedCallStatus === 'true' && activeSection === 'upload') {
-        // Use setTimeout to ensure state is updated
-        setTimeout(() => {
-          startAutoRefresh();
-        }, 100);
-      }
+      // Don't resume auto-refresh on page load - always fetch fresh data from server
+      // The server will have the actual call status, not stale localStorage state
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkingAuth, isAuthenticated, activeSection]);
@@ -144,16 +122,56 @@ function App() {
     }
     try {
       // Use the filename parameter directly (not selectedFile state which may not be updated yet)
-      const response = filename
-        ? await getCSVData(filename, includeOutput)  // Filter by specific file
-        : await getAllPatients();  // Get all patients
-      setPatients(response.patients || []);
+      let response;
+      if (filename) {
+        // When filtering by filename, get the most recent upload for that filename
+        // First, get file upload history to find the most recent upload_id for this filename
+        try {
+          const fileHistory = await getFileUploadHistory();
+          interface FileUpload {
+            id: number;
+            filename: string;
+            uploaded_at: string | null;
+            patient_count: number;
+            new_count: number;
+            updated_count: number;
+            error_count: number;
+            created_at: string | null;
+          }
+          const uploadsForFile = (fileHistory.history || [] as FileUpload[])
+            .filter((upload: FileUpload) => upload.filename === filename)
+            .sort((a: FileUpload, b: FileUpload) => {
+              const dateA = a.uploaded_at ? new Date(a.uploaded_at).getTime() : 0;
+              const dateB = b.uploaded_at ? new Date(b.uploaded_at).getTime() : 0;
+              return dateB - dateA; // Most recent first
+            });
+          
+          if (uploadsForFile.length > 0) {
+            // Use the most recent upload_id for this filename
+            const mostRecentUploadId = uploadsForFile[0].id;
+            response = await getPatientsByUploadId(mostRecentUploadId);
+          } else {
+            // Fallback to filename-based filtering if no upload found
+            response = await getCSVData(filename, includeOutput);
+          }
+        } catch (error) {
+          console.error('Failed to get upload history, falling back to filename filter:', error);
+          // Fallback to filename-based filtering
+          response = await getCSVData(filename, includeOutput);
+        }
+      } else {
+        response = await getAllPatients();  // Get all patients
+      }
+      const updatedPatients = response.patients || [];
+      setPatients(updatedPatients);
+      patientsRef.current = updatedPatients; // Update ref for refresh logic
     } catch (error) {
       console.error('Failed to load patient data:', error);
       if (!silent) {
         showMessage('error', 'Failed to load patient data');
       }
       setPatients([]);  // Clear patients on error
+      patientsRef.current = [];
     } finally {
       if (!silent) {
         setLoading(false);
@@ -311,6 +329,7 @@ function App() {
           }
         });
         setActiveCalls(newActiveCalls);
+          activeCallsRef.current = newActiveCalls; // Update ref
         
         // Store in localStorage
         const activeCallsData = Array.from(newActiveCalls.entries());
@@ -321,8 +340,11 @@ function App() {
       
       // Immediately refresh patient table to show updated data (silent)
       if (activeSection === 'upload') {
-        loadPatientData(null, true, true);  // Load all from DB silently
-        startAutoRefresh();  // Start auto-refresh for continued updates
+        // Immediate refresh right after batch call
+        loadPatientData(null, true, true);
+        
+        // Start smart auto-refresh that stops when calls complete
+        startSmartAutoRefresh();
       }
       
       // Refresh dashboard stats after calls
@@ -339,7 +361,7 @@ function App() {
     }
   };
 
-  const startAutoRefresh = () => {
+  const startSmartAutoRefresh = () => {
     // Clear any existing interval first
     if (refreshIntervalRef.current) {
       clearInterval(refreshIntervalRef.current);
@@ -352,9 +374,10 @@ function App() {
     }
 
     let count = 0;
-    const maxRefreshes = 40; // 40 * 3 seconds = 2 minutes
+    const maxRefreshes = 60; // Maximum 60 refreshes (2 minutes max)
+    const refreshInterval = 2000; // Check every 2 seconds
     
-    refreshIntervalRef.current = window.setInterval(() => {
+    const checkAndRefresh = async () => {
       // Stop if calls are no longer in progress
       if (!callingInProgress || count >= maxRefreshes) {
         if (refreshIntervalRef.current) {
@@ -366,9 +389,73 @@ function App() {
         return;
       }
 
-      // Only refresh if we're in the upload section (where patient table is visible)
+      // Only refresh if we're in the upload section
       if (activeSection === 'upload') {
-        loadPatientData(null, true, true);  // Load all from database (silent)
+        const currentActiveCalls = activeCallsRef.current;
+        
+        // Use lightweight call status endpoint for active calls
+        if (currentActiveCalls.size > 0) {
+          const phoneNumbers = Array.from(currentActiveCalls.keys());
+          
+          try {
+            // Check call status using lightweight endpoint
+            const statusResponse = await getCallStatus(phoneNumbers);
+            
+            if (statusResponse.success && statusResponse.statuses) {
+              // Check if any calls are still pending/in progress
+              let hasPendingCalls = false;
+              let allCallsCompleted = true;
+              
+              statusResponse.statuses.forEach((status) => {
+                const callStatus = status.recent_call_status || status.call_status;
+                // If status is 'sent' or 'pending', call might still be in progress
+                if (callStatus === 'sent' || callStatus === 'pending' || !callStatus) {
+                  hasPendingCalls = true;
+                  allCallsCompleted = false;
+                } else if (callStatus === 'completed' || callStatus === 'failed') {
+                  // Call is done, but check others
+                }
+              });
+              
+              // If all calls are completed/failed and enough time has passed, stop refreshing
+              if (!hasPendingCalls && allCallsCompleted && count >= 3) {
+                // Refresh full patient data once to get final updates
+                await loadPatientData(null, true, true);
+                
+                // Stop refreshing
+                if (refreshIntervalRef.current) {
+                  clearInterval(refreshIntervalRef.current);
+                  refreshIntervalRef.current = null;
+                }
+                setCallingInProgress(false);
+                localStorage.removeItem('callingInProgress');
+                return;
+              }
+              
+              // If calls are still pending, refresh full patient data every 5th check (every 10 seconds)
+              // This ensures UI stays updated but doesn't overload the server
+              if (count % 5 === 0) {
+                await loadPatientData(null, true, true);
+              }
+            }
+          } catch (error) {
+            console.error('Failed to check call status:', error);
+            // Fallback to full refresh if status check fails
+            if (count % 3 === 0) {
+              await loadPatientData(null, true, true);
+            }
+          }
+        } else {
+          // No active calls, refresh full data once and stop
+          await loadPatientData(null, true, true);
+          if (refreshIntervalRef.current) {
+            clearInterval(refreshIntervalRef.current);
+            refreshIntervalRef.current = null;
+          }
+          setCallingInProgress(false);
+          localStorage.removeItem('callingInProgress');
+          return;
+        }
       }
       
         count++;
@@ -391,6 +478,7 @@ function App() {
             localStorage.setItem('activeCalls', JSON.stringify(activeCallsData));
           }
           
+        activeCallsRef.current = newActiveCalls; // Update ref
           return newActiveCalls;
         });
 
@@ -404,9 +492,18 @@ function App() {
         localStorage.removeItem('callingInProgress');
         // Clear active calls that are older than 10 minutes
         setActiveCalls(new Map());
+        activeCallsRef.current = new Map(); // Update ref
         localStorage.removeItem('activeCalls');
       }
-    }, 3000);
+    };
+    
+    // Start the interval
+    refreshIntervalRef.current = window.setInterval(checkAndRefresh, refreshInterval);
+    
+    // Also do an immediate first refresh
+    if (activeSection === 'upload') {
+      loadPatientData(null, true, true);
+    }
   };
 
   const stopAutoRefresh = () => {
@@ -434,8 +531,15 @@ function App() {
   };
 
   const handleCallPatient = (patient: Patient) => {
-    if (!patient.phone_number) {
-      showMessage('error', 'Phone number not available');
+    const phone = patient.phone_number && patient.phone_number.toLowerCase() !== 'nan' ? patient.phone_number : '';
+    const invoice = patient.invoice_number && patient.invoice_number.toLowerCase() !== 'nan' ? patient.invoice_number : '';
+    
+    if (!phone || phone.length < 10) {
+      showMessage('error', 'Cannot make call: Phone number is missing or invalid (minimum 10 digits required)');
+      return;
+    }
+    if (!invoice) {
+      showMessage('error', 'Cannot make call: Invoice number is missing (required for identification)');
       return;
     }
     
@@ -467,27 +571,55 @@ function App() {
         const newActiveCalls = new Map(activeCalls);
         newActiveCalls.set(patient.phone_number, Date.now());
         setActiveCalls(newActiveCalls);
+        activeCallsRef.current = newActiveCalls; // Update ref
         localStorage.setItem('activeCalls', JSON.stringify(Array.from(newActiveCalls.entries())));
         
         showMessage('success', response.message || `Call initiated to ${patient.patient_name}`);
         showToast('success', `Call initiated to ${patient.patient_name}`);
         
-        // Refresh patient table to show updated call status
+        // Refresh patient table to show updated call status immediately
         if (activeSection === 'upload') {
-          // Immediate refresh
+          // Immediate refresh right after call
           loadPatientData(null, true, true);
           
-          // Also refresh periodically to catch updated call summaries (silent)
+          // Start smart refresh using lightweight call status endpoint
           let refreshCount = 0;
-          const maxRefreshes = 15; // Refresh 15 times over 45 seconds to catch summary updates
-          const refreshInterval = setInterval(() => {
+          const maxRefreshes = 30; // Check 30 times (60 seconds max for single call)
+          const singleCallRefreshInterval = setInterval(async () => {
             if (activeSection === 'upload' && refreshCount < maxRefreshes) {
-              loadPatientData(null, true, true);  // Silent refresh
+              try {
+                // Use lightweight endpoint to check call status
+                const statusResponse = await getCallStatus([patient.phone_number]);
+                
+                if (statusResponse.success && statusResponse.statuses.length > 0) {
+                  const status = statusResponse.statuses[0];
+                  const callStatus = status.recent_call_status || status.call_status;
+                  
+                  // If call is completed or failed, refresh full data and stop
+                  if (callStatus === 'completed' || callStatus === 'failed') {
+                    await loadPatientData(null, true, true);
+                    clearInterval(singleCallRefreshInterval);
+                    return;
+                  }
+                }
+                
+                // Refresh full patient data every 5th check (every 10 seconds)
+                if (refreshCount % 5 === 0) {
+                  await loadPatientData(null, true, true);
+                }
+              } catch (error) {
+                console.error('Failed to check call status:', error);
+                // Fallback to full refresh
+                if (refreshCount % 3 === 0) {
+                  await loadPatientData(null, true, true);
+                }
+              }
+              
               refreshCount++;
             } else {
-              clearInterval(refreshInterval);
+              clearInterval(singleCallRefreshInterval);
             }
-          }, 3000); // Every 3 seconds
+          }, 2000); // Every 2 seconds
         }
       } else {
         showMessage('error', response.message || 'Failed to initiate call');
@@ -639,11 +771,14 @@ function App() {
                     onChange={async (e) => {
                       const newValue = e.target.value;
                       setSelectedFile(newValue);
-                      // Immediately load data based on selection
+                      setCurrentFile(newValue || 'database');
+                      // Immediately load data based on selection - always filter by filename when selected
                       if (newValue) {
+                        // Always filter by the selected filename
                         await loadPatientData(newValue, false, true);
                       } else {
-                        await loadPatientData(null, false, true);  // Load all
+                        // Load all when "All Patients" is selected
+                        await loadPatientData(null, false, true);
                       }
                     }}
                     className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-teal-500"

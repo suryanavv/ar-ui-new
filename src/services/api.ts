@@ -10,6 +10,20 @@ const api = axios.create({
   },
 });
 
+// Request interceptor to add authentication token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
 // Upload CSV file
 export const uploadCSV = async (file: File) => {
   const formData = new FormData();
@@ -216,6 +230,57 @@ export const getCallStatus = async (phoneNumbers: string[]): Promise<{
   const response = await api.get('/call-status', {
     params: { phone_numbers: phoneNumbers.join(',') }
   });
+  return response.data;
+};
+
+// User Management APIs
+export const getUsers = async (): Promise<{ success: boolean; users: Array<{
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  clinic: string;
+  is_active: boolean;
+  created_at: string;
+  ims_user_id: string | null;
+}> }> => {
+  const response = await api.get('/users/');
+  // Backend returns array directly, wrap it in expected format
+  return { success: true, users: response.data };
+};
+
+export const createUser = async (userData: {
+  email: string;
+  full_name: string;
+  password: string;
+  role: string;
+}): Promise<{ success: boolean; user: {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  clinic: string;
+  is_active: boolean;
+  created_at: string;
+} }> => {
+  const response = await api.post('/users/', userData);
+  return response.data;
+};
+
+export const updateUser = async (userId: number, updates: {
+  is_active?: boolean;
+  role?: string;
+  full_name?: string;
+}): Promise<{ success: boolean; user: {
+  id: number;
+  email: string;
+  full_name: string;
+  role: string;
+  clinic: string;
+  is_active: boolean;
+  created_at: string;
+} }> => {
+  const response = await api.put(`/users/${userId}/`, updates);
   return response.data;
 };
 

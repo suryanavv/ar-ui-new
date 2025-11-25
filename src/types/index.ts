@@ -2,6 +2,9 @@ export interface User {
   id: number;
   email: string;
   full_name: string;
+  role?: string; // 'admin' or 'user'
+  clinic?: string; // Clinic name
+  ims_user_id?: string; // IMS user ID for SSO users
 }
 
 export interface Patient {

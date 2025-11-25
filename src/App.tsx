@@ -11,8 +11,10 @@ import {
   NotesModal,
   CallHistoryModal,
   LoginPage,
+  SSOLogin,
   Dashboard,
   InvoiceList,
+  UserManagement,
   ToastContainer,
   useToast
 } from './components';
@@ -24,6 +26,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [isSSOMode, setIsSSOMode] = useState(false);
 
   // Existing state
   const [currentFile, setCurrentFile] = useState<string>('');
@@ -31,7 +34,7 @@ function App() {
   const [availableFiles, setAvailableFiles] = useState<string[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'upload' | 'invoice-list'>('dashboard');  // Dashboard by default
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'upload' | 'invoice-list' | 'users'>('dashboard');  // Dashboard by default
   const [uploadLoading, setUploadLoading] = useState(false);
   const [message, setMessage] = useState<Message | null>(null);
   const [callingInProgress, setCallingInProgress] = useState(false);
@@ -49,6 +52,18 @@ function App() {
 
   // Check if user is already logged in on mount
   useEffect(() => {
+    // Check URL for SSO token parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const ssoToken = urlParams.get('token');
+    
+    if (ssoToken) {
+      // SSO login mode
+      setIsSSOMode(true);
+      setCheckingAuth(false);
+      return;
+    }
+    
+    // Check for existing session
     const token = localStorage.getItem('access_token');
     const storedUser = localStorage.getItem('user');
     
@@ -98,6 +113,11 @@ function App() {
 
   // Handle login
   const handleLogin = (_token: string, userData: User) => {
+    setIsSSOMode(false);
+    // Clear URL params if coming from SSO
+    if (window.location.search) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
     setIsAuthenticated(true);
     setUser(userData);
   };
@@ -643,10 +663,18 @@ function App() {
     );
   }
 
+  // Show SSO login if in SSO mode
+  if (isSSOMode) {
+    return <SSOLogin onLogin={handleLogin} />;
+  }
+
   // Show login page if not authenticated
   if (!isAuthenticated) {
     return <LoginPage onLogin={handleLogin} />;
   }
+
+  // Check if user is admin
+  const isAdmin = user?.role === 'admin';
 
   // Show main dashboard if authenticated
   return (
@@ -725,6 +753,24 @@ function App() {
                 Invoice List
               </div>
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => {
+                  if (refreshIntervalRef.current) {
+                    clearInterval(refreshIntervalRef.current);
+                    refreshIntervalRef.current = null;
+                  }
+                  setActiveSection('users');
+                }}
+                className={`flex-1 px-6 py-4 font-semibold text-sm transition-colors ${
+                  activeSection === 'users'
+                    ? 'bg-teal-50 text-teal-700 border-b-2 border-teal-700'
+                    : 'text-gray-600 hover:text-teal-700 hover:bg-gray-50'
+                }`}
+              >
+                User Management
+              </button>
+            )}
           </div>
         </div>
 
@@ -745,6 +791,9 @@ function App() {
             />
           </div>
         )}
+
+        {/* User Management Section */}
+        {activeSection === 'users' && isAdmin && <UserManagement />}
 
         {/* Upload CSV Section */}
         {activeSection === 'upload' && (

@@ -372,7 +372,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
       <ConfirmModal
         isOpen={showCallConfirmModal}
         title="Call Patient"
-        message={`Are you sure you want to call ${patientToCall?.patient_name || 'this patient'} at ${patientToCall?.phone_number || ''}?`}
+        message={`Are you sure you want to call ${patientToCall ? `${patientToCall.patient_first_name || ''} ${patientToCall.patient_last_name || ''}`.trim() || 'this patient' : 'this patient'} at ${patientToCall?.phone_number || ''}?`}
         onConfirm={confirmCallPatient}
         onCancel={() => {
           setShowCallConfirmModal(false);
@@ -382,7 +382,8 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
 
       <CallHistoryModal
         isOpen={showCallHistoryModal}
-        patientName={selectedPatient?.patient_name || ''}
+        patientFirstName={selectedPatient?.patient_first_name || ''}
+        patientLastName={selectedPatient?.patient_last_name || ''}
         phoneNumber={selectedPatient?.phone_number || ''}
         invoiceNumber={selectedPatient?.invoice_number || ''}
         onClose={() => {
@@ -393,7 +394,8 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
 
       <NotesModal
         isOpen={showNotesModal}
-        patientName={selectedPatient?.patient_name || ''}
+        patientFirstName={selectedPatient?.patient_first_name || ''}
+        patientLastName={selectedPatient?.patient_last_name || ''}
         notes={selectedPatient?.notes || ''}
         onClose={() => {
           setShowNotesModal(false);

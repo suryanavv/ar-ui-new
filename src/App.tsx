@@ -46,7 +46,6 @@ function App() {
   const [showPatientDetails, setShowPatientDetails] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [patientToCall, setPatientToCall] = useState<Patient | null>(null);
-  const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
   const [activeCalls, setActiveCalls] = useState<Map<string, number>>(new Map()); // phone_number -> timestamp
   const activeCallsRef = useRef<Map<string, number>>(new Map()); // Ref to track active calls for refresh logic
   const refreshIntervalRef = useRef<number | null>(null);
@@ -558,9 +557,6 @@ function App() {
   const handleViewDetails = (patient: Patient) => {
     // Store patient info for details view
     setSelectedPatient(patient);
-    if (patient.id) {
-      setSelectedPatientId(patient.id);
-    }
     setShowPatientDetails(true);
   };
 
@@ -959,7 +955,6 @@ function App() {
             isOpen={showPatientDetails}
             onClose={() => {
               setShowPatientDetails(false);
-              setSelectedPatientId(null);
             }}
           />
         )}

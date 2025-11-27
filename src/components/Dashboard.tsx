@@ -105,6 +105,65 @@ export const Dashboard = () => {
     }).format(amount);
   };
 
+  // Normalize aging buckets by grouping case-insensitively
+  const normalizeAgingBuckets = (buckets: Array<{ bucket: string; count: number; total_amount: number }>) => {
+    const normalizedMap = new Map<string, { bucket: string; count: number; total_amount: number }>();
+    
+    buckets.forEach(item => {
+      // Normalize bucket name to lowercase for comparison, but keep original format for display
+      const normalizedKey = item.bucket.toLowerCase().trim();
+      const existing = normalizedMap.get(normalizedKey);
+      
+      if (existing) {
+        // Merge: combine counts and amounts, keep the first bucket's display format
+        existing.count += item.count;
+        existing.total_amount += item.total_amount;
+      } else {
+        // First occurrence: use original bucket name format
+        normalizedMap.set(normalizedKey, {
+          bucket: item.bucket.trim(), // Keep original format but trim whitespace
+          count: item.count,
+          total_amount: item.total_amount
+        });
+      }
+    });
+    
+    return Array.from(normalizedMap.values());
+  };
+
+  // Export aging bucket data to CSV (frontend only)
+  const exportAgingBucketsToCSV = () => {
+    if (!stats || !stats.aging_distribution || stats.aging_distribution.length === 0) {
+      return;
+    }
+
+    const normalizedBuckets = normalizeAgingBuckets(stats.aging_distribution);
+    
+    // Create CSV content
+    const headers = ['Aging Bucket', 'Invoice Count', 'Total Amount'];
+    const rows = normalizedBuckets.map(bucket => [
+      bucket.bucket,
+      bucket.count.toString(),
+      bucket.total_amount.toFixed(2) // Use raw number with 2 decimal places
+    ]);
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+    
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `outstanding_aging_buckets_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
 
 
   // Show empty state if no data
@@ -261,10 +320,26 @@ export const Dashboard = () => {
 
         {/* Outstanding by Aging Bucket */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Outstanding by Aging Bucket</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Outstanding by Aging Bucket</h3>
+            <button
+              onClick={exportAgingBucketsToCSV}
+              disabled={!stats || !stats.aging_distribution || stats.aging_distribution.length === 0}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm border-2 rounded-lg font-medium transition-all ${
+                !stats || !stats.aging_distribution || stats.aging_distribution.length === 0
+                  ? 'opacity-60 cursor-not-allowed border-gray-300 text-gray-400'
+                  : 'border-teal-700 text-teal-700 hover:bg-teal-50 hover:shadow-md'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              <span>Export CSV</span>
+            </button>
+          </div>
           <div className="space-y-3">
             {stats.aging_distribution.length > 0 ? (
-              stats.aging_distribution.map((item, index) => (
+              normalizeAgingBuckets(stats.aging_distribution).map((item, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-700">{item.bucket}</span>
                   <div className="flex items-center gap-3">

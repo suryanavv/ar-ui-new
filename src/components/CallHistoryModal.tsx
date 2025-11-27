@@ -45,7 +45,18 @@ export const CallHistoryModal = ({ isOpen, patientFirstName, patientLastName, ph
     setError(null);
     try {
       const data = await getCallHistory(phoneNumber, invoiceNumber);
-      setCalls(data.calls || []);
+      // Filter calls on frontend to ensure we only show calls for this specific phone + invoice combination
+      // This prevents showing calls for other patients with same phone number or name
+      const filteredCalls = (data.calls || []).filter(call => {
+        const callPhone = (call.phone_number || '').trim();
+        const callInvoice = (call.invoice_number || '').trim();
+        const targetPhone = phoneNumber.trim();
+        const targetInvoice = invoiceNumber.trim();
+        
+        // Must match both phone number AND invoice number exactly
+        return callPhone === targetPhone && callInvoice === targetInvoice;
+      });
+      setCalls(filteredCalls);
     } catch (err) {
       console.error('Failed to load call history:', err);
       setError('Failed to load call history');
@@ -112,32 +123,46 @@ export const CallHistoryModal = ({ isOpen, patientFirstName, patientLastName, ph
             </div>
           ) : (
             <div className="space-y-4">
-              {calls.map((call) => (
-                <div key={call.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <FiClock className="text-gray-400" size={16} />
-                      <span className="text-xs text-gray-500">{formatDateTime(call.called_at)}</span>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        call.call_status === 'completed' 
-                          ? 'bg-green-100 text-green-800' 
-                          : call.call_status === 'failed'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {call.call_status}
-                      </span>
+              {calls.map((call) => {
+                const callPatientName = getFullName(call.patient_first_name || '', call.patient_last_name || '');
+                return (
+                  <div key={call.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <FiClock className="text-gray-400" size={16} />
+                          <span className="text-xs text-gray-500">{formatDateTime(call.called_at)}</span>
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            call.call_status === 'completed' 
+                              ? 'bg-green-100 text-green-800' 
+                              : call.call_status === 'failed'
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {call.call_status}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-600 ml-6">
+                          <span className="font-medium">Patient:</span> {callPatientName}
+                          {call.invoice_number && (
+                            <> | <span className="font-medium">Invoice:</span> {call.invoice_number}</>
+                          )}
+                          {call.phone_number && (
+                            <> | <span className="font-medium">Phone:</span> {call.phone_number}</>
+                          )}
+                        </div>
+                      </div>
                     </div>
+                    {call.notes && (
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-white rounded-lg p-3 border border-gray-200">
+                          {call.notes}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  {call.notes && (
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-white rounded-lg p-3 border border-gray-200">
-                        {call.notes}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

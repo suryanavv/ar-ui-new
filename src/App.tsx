@@ -80,6 +80,12 @@ function App() {
       setCurrentFile(storedCurrentFile);
     }
     
+    // Restore active section from localStorage to preserve tab on reload
+    const storedActiveSection = localStorage.getItem('activeSection');
+    if (storedActiveSection && ['dashboard', 'upload', 'invoice-list', 'users'].includes(storedActiveSection)) {
+      setActiveSection(storedActiveSection as 'dashboard' | 'upload' | 'invoice-list' | 'users');
+    }
+    
     // Don't restore callingInProgress from localStorage - always fetch fresh status from server
     // Clear any stale calling status
     localStorage.removeItem('callingInProgress');
@@ -715,6 +721,7 @@ function App() {
                   refreshIntervalRef.current = null;
                 }
                 setActiveSection('dashboard');
+                localStorage.setItem('activeSection', 'dashboard');
                 // Refresh dashboard when switching to it
                 setTimeout(() => {
                   const refreshDashboard = (window as { refreshDashboard?: () => void }).refreshDashboard;
@@ -739,6 +746,7 @@ function App() {
             <button
               onClick={() => {
                 setActiveSection('upload');
+                localStorage.setItem('activeSection', 'upload');
                 // Load patient data when switching to upload section
                 loadPatientData(null, false, true);
               }}
@@ -758,6 +766,7 @@ function App() {
             <button
               onClick={() => {
                 setActiveSection('invoice-list');
+                localStorage.setItem('activeSection', 'invoice-list');
               }}
               className={`flex-1 px-6 py-4 font-semibold text-sm transition-colors ${
                 activeSection === 'invoice-list'
@@ -780,6 +789,7 @@ function App() {
                     refreshIntervalRef.current = null;
                   }
                   setActiveSection('users');
+                  localStorage.setItem('activeSection', 'users');
                 }}
                 className={`flex-1 px-6 py-4 font-semibold text-sm transition-colors ${
                   activeSection === 'users'

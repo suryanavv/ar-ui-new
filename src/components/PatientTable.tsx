@@ -14,8 +14,16 @@ interface PatientTableProps {
 export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, onViewCallHistory, onViewDetails, activeCalls = new Map() }: PatientTableProps) => {
   // Check if call is currently active (only for the first 5 minutes after initiation)
   // This allows users to call again after the call completes
-  const isCallActive = (phoneNumber: string): boolean => {
-    if (!activeCalls.has(phoneNumber)) return false;
+  // Also checks patient's call_status to avoid showing "Calling..." for completed/failed calls
+  const isCallActive = (patient: Patient): boolean => {
+    // If call is already completed or failed, don't show "Calling..."
+    if (patient.call_status === 'completed' || patient.call_status === 'failed') {
+      return false;
+    }
+    
+    const phoneNumber = patient.phone_number;
+    if (!phoneNumber || !activeCalls.has(phoneNumber)) return false;
+    
     const timestamp = activeCalls.get(phoneNumber)!;
     const now = Date.now();
     // Consider call active only if initiated within last 5 minutes
@@ -291,7 +299,7 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                           <FiPhone size={14} />
                           Missing Name
                         </button>
-                      ) : isCallActive(patient.phone_number) ? (
+                      ) : isCallActive(patient) ? (
                         <button
                           disabled
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-400 rounded-lg text-xs font-semibold cursor-not-allowed"
@@ -520,7 +528,7 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                           <FiPhone size={14} />
                           Missing Name
                         </button>
-                      ) : isCallActive(patient.phone_number) ? (
+                      ) : isCallActive(patient) ? (
                         <button
                           disabled
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-gray-300 text-gray-400 rounded-lg text-xs font-semibold cursor-not-allowed"

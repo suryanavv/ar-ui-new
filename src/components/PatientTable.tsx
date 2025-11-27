@@ -12,6 +12,15 @@ interface PatientTableProps {
 }
 
 export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, onViewCallHistory, onViewDetails, activeCalls = new Map() }: PatientTableProps) => {
+  // Helper function to create unique key for each patient record (same as in InvoiceList)
+  const getPatientCallKey = (patient: Patient): string => {
+    const phone = patient.phone_number || '';
+    const invoice = patient.invoice_number || '';
+    const firstName = patient.patient_first_name || '';
+    const lastName = patient.patient_last_name || '';
+    return `${phone}|${invoice}|${firstName}|${lastName}`;
+  };
+
   // Check if call is currently active (only for the first 5 minutes after initiation)
   // This allows users to call again after the call completes
   // Also checks patient's call_status to avoid showing "Calling..." for completed/failed calls
@@ -21,10 +30,10 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
       return false;
     }
     
-    const phoneNumber = patient.phone_number;
-    if (!phoneNumber || !activeCalls.has(phoneNumber)) return false;
+    const callKey = getPatientCallKey(patient);
+    if (!callKey || !activeCalls.has(callKey)) return false;
     
-    const timestamp = activeCalls.get(phoneNumber)!;
+    const timestamp = activeCalls.get(callKey)!;
     const now = Date.now();
     // Consider call active only if initiated within last 5 minutes
     // After that, allow calling again (call likely completed)

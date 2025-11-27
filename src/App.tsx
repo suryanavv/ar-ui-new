@@ -46,8 +46,17 @@ function App() {
   const [showPatientDetails, setShowPatientDetails] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [patientToCall, setPatientToCall] = useState<Patient | null>(null);
-  const [activeCalls, setActiveCalls] = useState<Map<string, number>>(new Map()); // phone_number -> timestamp
+  const [activeCalls, setActiveCalls] = useState<Map<string, number>>(new Map()); // unique_key -> timestamp
   const activeCallsRef = useRef<Map<string, number>>(new Map()); // Ref to track active calls for refresh logic
+
+  // Helper function to create unique key for each patient record
+  const getPatientCallKey = (patient: Patient): string => {
+    const phone = patient.phone_number || '';
+    const invoice = patient.invoice_number || '';
+    const firstName = patient.patient_first_name || '';
+    const lastName = patient.patient_last_name || '';
+    return `${phone}|${invoice}|${firstName}|${lastName}`;
+  };
   const refreshIntervalRef = useRef<number | null>(null);
   const patientsRef = useRef<Patient[]>([]); // Ref to track patients for refresh logic
   const { toasts, showToast, removeToast } = useToast();
@@ -354,8 +363,23 @@ function App() {
       if (response.results?.calls) {
         response.results.calls.forEach((call) => {
           if (call.success && call.phone_number) {
-            // Mark call as active for next 10 minutes (calls typically last 5-10 minutes)
-            newActiveCalls.set(call.phone_number, now);
+            // Try to find the patient record to get full details for unique key
+            // Match by phone number and patient names from the call response
+            const patient = patients.find(p => 
+              p.phone_number === call.phone_number &&
+              p.patient_first_name === call.patient_first_name &&
+              p.patient_last_name === call.patient_last_name
+            );
+            
+            if (patient) {
+              // Use unique key if we found the patient record
+              const callKey = getPatientCallKey(patient);
+              newActiveCalls.set(callKey, now);
+            } else {
+              // Fallback to phone number if patient record not found (shouldn't happen normally)
+              // This can happen if the patient list hasn't been loaded yet
+              newActiveCalls.set(call.phone_number, now);
+            }
           }
         });
         setActiveCalls(newActiveCalls);
@@ -425,7 +449,14 @@ function App() {
         
         // Use lightweight call status endpoint for active calls
         if (currentActiveCalls.size > 0) {
-          const phoneNumbers = Array.from(currentActiveCalls.keys());
+          // Extract unique phone numbers from call keys (keys are in format "phone|invoice|firstName|lastName")
+          const phoneNumbers = Array.from(new Set(
+            Array.from(currentActiveCalls.keys()).map(key => {
+              // Extract phone number from key (format: "phone|invoice|firstName|lastName")
+              const parts = key.split('|');
+              return parts[0]; // First part is phone number
+            })
+          ));
           
           try {
             // Check call status using lightweight endpoint
@@ -612,9 +643,10 @@ function App() {
       );
       
       if (response.success) {
-        // Track this call as active
+        // Track this call as active using unique key (phone + invoice + names)
+        const callKey = getPatientCallKey(patient);
         const newActiveCalls = new Map(activeCalls);
-        newActiveCalls.set(patient.phone_number, Date.now());
+        newActiveCalls.set(callKey, Date.now());
         setActiveCalls(newActiveCalls);
         activeCallsRef.current = newActiveCalls; // Update ref
         localStorage.setItem('activeCalls', JSON.stringify(Array.from(newActiveCalls.entries())));

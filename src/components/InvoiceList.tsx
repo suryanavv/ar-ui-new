@@ -124,6 +124,15 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
     setShowCallConfirmModal(true);
   };
 
+  // Helper function to create unique key for each patient record
+  const getPatientCallKey = (patient: Patient): string => {
+    const phone = patient.phone_number || '';
+    const invoice = patient.invoice_number || '';
+    const firstName = patient.patient_first_name || '';
+    const lastName = patient.patient_last_name || '';
+    return `${phone}|${invoice}|${firstName}|${lastName}`;
+  };
+
   const confirmCallPatient = async () => {
     if (!patientToCall) {
       setShowCallConfirmModal(false);
@@ -131,13 +140,14 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
     }
 
     const phoneNumber = patientToCall.phone_number;
+    const callKey = getPatientCallKey(patientToCall);
     
     try {
-      // Track active call
+      // Track active call using unique key (phone + invoice + names)
       const now = Date.now();
       setActiveCalls(prev => {
         const newMap = new Map(prev);
-        newMap.set(phoneNumber, now);
+        newMap.set(callKey, now);
         return newMap;
       });
 
@@ -170,7 +180,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
         // Remove from active calls on failure
         setActiveCalls(prev => {
           const newMap = new Map(prev);
-          newMap.delete(phoneNumber);
+          newMap.delete(callKey);
           return newMap;
         });
       }
@@ -181,7 +191,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
       // Remove from active calls on error
       setActiveCalls(prev => {
         const newMap = new Map(prev);
-        newMap.delete(phoneNumber);
+        newMap.delete(callKey);
         return newMap;
       });
     } finally {
@@ -192,7 +202,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
       setTimeout(() => {
         setActiveCalls(prev => {
           const newMap = new Map(prev);
-          newMap.delete(phoneNumber);
+          newMap.delete(callKey);
           return newMap;
         });
       }, 5 * 60 * 1000);

@@ -5,6 +5,7 @@ import { formatDateTime } from '../utils/timezone';
 import { PatientTable } from './PatientTable';
 import { CallHistoryModal } from './CallHistoryModal';
 import { NotesModal } from './NotesModal';
+import { PatientDetails } from './PatientDetails';
 import { ConfirmModal } from './ConfirmModal';
 import { MessageAlert } from './MessageAlert';
 
@@ -31,6 +32,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
   const [showCallHistoryModal, setShowCallHistoryModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showCallConfirmModal, setShowCallConfirmModal] = useState(false);
+  const [showPatientDetailsModal, setShowPatientDetailsModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [patientToCall, setPatientToCall] = useState<Patient | null>(null);
   const [activeCalls, setActiveCalls] = useState<Map<string, number>>(new Map());
@@ -99,6 +101,17 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
     }
     setSelectedPatient(patient);
     setShowCallHistoryModal(true);
+  };
+
+  const handleViewDetails = (patient: Patient) => {
+    console.log('handleViewDetails called with patient:', patient);
+    console.log('Patient ID:', patient.id);
+    console.log('Phone:', patient.phone_number);
+    console.log('Invoice:', patient.invoice_number);
+    console.log('First Name:', patient.patient_first_name);
+    console.log('Last Name:', patient.patient_last_name);
+    setSelectedPatient(patient);
+    setShowPatientDetailsModal(true);
   };
 
   const showMessage = (type: 'success' | 'error' | 'info', text: string) => {
@@ -267,6 +280,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
                 onViewNotes={handleViewNotes}
                 onCallPatient={handleCallPatient}
                 onViewCallHistory={handleViewCallHistory}
+                onViewDetails={handleViewDetails}
                 activeCalls={activeCalls}
               />
             </div>
@@ -304,6 +318,19 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
           notes={selectedPatient?.notes || ''}
           onClose={() => {
             setShowNotesModal(false);
+            setSelectedPatient(null);
+          }}
+        />
+
+        <PatientDetails
+          isOpen={showPatientDetailsModal}
+          invoiceId={selectedPatient?.id}
+          phoneNumber={selectedPatient?.phone_number || ''}
+          invoiceNumber={selectedPatient?.invoice_number || ''}
+          patientFirstName={selectedPatient?.patient_first_name || ''}
+          patientLastName={selectedPatient?.patient_last_name || ''}
+          onClose={() => {
+            setShowPatientDetailsModal(false);
             setSelectedPatient(null);
           }}
         />
@@ -409,6 +436,19 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
         notes={selectedPatient?.notes || ''}
         onClose={() => {
           setShowNotesModal(false);
+          setSelectedPatient(null);
+        }}
+      />
+
+      <PatientDetails
+        isOpen={showPatientDetailsModal}
+        invoiceId={selectedPatient?.id}
+        phoneNumber={selectedPatient?.phone_number || ''}
+        invoiceNumber={selectedPatient?.invoice_number || ''}
+        patientFirstName={selectedPatient?.patient_first_name || ''}
+        patientLastName={selectedPatient?.patient_last_name || ''}
+        onClose={() => {
+          setShowPatientDetailsModal(false);
           setSelectedPatient(null);
         }}
       />

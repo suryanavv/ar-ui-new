@@ -1,5 +1,6 @@
 import type { Patient } from '../types';
 import { FiEye, FiPhone } from 'react-icons/fi';
+import { parseNotes } from '../utils/notesParser';
 
 interface PatientTableProps {
   patients: Patient[];
@@ -253,9 +254,42 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                 <td className="px-4 py-4 text-sm min-w-[200px] max-w-md">
                   {patient.recent_call_notes && patient.recent_call_notes.trim() ? (
                     <div className="group relative">
+                      {(() => {
+                        const parsedNotes = parseNotes(patient.recent_call_notes);
+                        const latestNote = parsedNotes.length > 0 ? parsedNotes[parsedNotes.length - 1] : null;
+                        
+                        if (latestNote && latestNote.timestamp) {
+                          // Show formatted preview with icon
+                          const preview = latestNote.content.length > 150 
+                            ? latestNote.content.substring(0, 150) + '...'
+                            : latestNote.content;
+                          
+                          return (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500 font-medium">
+                                  {latestNote.timestamp.split(' ')[0]} {/* Just the date */}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-700 leading-relaxed break-words line-clamp-3">
+                                {preview}
+                              </p>
+                              {parsedNotes.length > 1 && (
+                                <p className="text-xs text-gray-400 italic">
+                                  +{parsedNotes.length - 1} more entr{parsedNotes.length - 1 === 1 ? 'y' : 'ies'}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        }
+                        
+                        // Fallback to raw display if parsing fails
+                        return (
                       <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
                         {patient.recent_call_notes}
                       </p>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <span className="text-gray-400 text-xs">No notes</span>
@@ -482,9 +516,42 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                 <td className="px-4 py-4 text-sm min-w-[200px] max-w-md">
                   {patient.recent_call_notes && patient.recent_call_notes.trim() ? (
                     <div className="group relative">
+                      {(() => {
+                        const parsedNotes = parseNotes(patient.recent_call_notes);
+                        const latestNote = parsedNotes.length > 0 ? parsedNotes[parsedNotes.length - 1] : null;
+                        
+                        if (latestNote && latestNote.timestamp) {
+                          // Show formatted preview with icon
+                          const preview = latestNote.content.length > 150 
+                            ? latestNote.content.substring(0, 150) + '...'
+                            : latestNote.content;
+                          
+                          return (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-500 font-medium">
+                                  {latestNote.timestamp.split(' ')[0]} {/* Just the date */}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-700 leading-relaxed break-words line-clamp-3">
+                                {preview}
+                              </p>
+                              {parsedNotes.length > 1 && (
+                                <p className="text-xs text-gray-400 italic">
+                                  +{parsedNotes.length - 1} more entr{parsedNotes.length - 1 === 1 ? 'y' : 'ies'}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        }
+                        
+                        // Fallback to raw display if parsing fails
+                        return (
                       <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap break-words max-h-32 overflow-y-auto">
                         {patient.recent_call_notes}
                       </p>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <span className="text-gray-400 text-xs">No notes</span>

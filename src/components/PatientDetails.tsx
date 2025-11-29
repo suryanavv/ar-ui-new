@@ -39,8 +39,18 @@ export const PatientDetails = ({
       setLoading(true);
       
       // Check if we have enough information
-      if (!invoiceId && (!phoneNumber || !invoiceNumber || !patientFirstName || !patientLastName)) {
-        setError('Insufficient information to load patient details');
+      const hasPhoneNumber = phoneNumber && phoneNumber.trim() !== '' && phoneNumber.toLowerCase() !== 'nan';
+      const hasInvoiceNumber = invoiceNumber && invoiceNumber.trim() !== '' && invoiceNumber.toLowerCase() !== 'nan';
+      const hasFirstName = patientFirstName && patientFirstName.trim() !== '' && patientFirstName.toLowerCase() !== 'nan';
+      const hasLastName = patientLastName && patientLastName.trim() !== '' && patientLastName.toLowerCase() !== 'nan';
+      
+      if (!invoiceId && (!hasPhoneNumber || !hasInvoiceNumber || !hasFirstName || !hasLastName)) {
+        const missingFields = [];
+        if (!hasPhoneNumber) missingFields.push('phone number');
+        if (!hasInvoiceNumber) missingFields.push('invoice number');
+        if (!hasFirstName) missingFields.push('first name');
+        if (!hasLastName) missingFields.push('last name');
+        setError(`Insufficient information to load patient details. Missing: ${missingFields.join(', ')}`);
         setLoading(false);
         return;
       }
@@ -75,7 +85,7 @@ export const PatientDetails = ({
     }
   }, [invoiceId, phoneNumber, invoiceNumber, patientFirstName, patientLastName, isOpen]);
 
-  // Don't render anything if modal is not open
+  // Always render the modal backdrop if isOpen is true, even if there's an error
   if (!isOpen) {
     return null;
   }
@@ -191,7 +201,7 @@ export const PatientDetails = ({
   const fullName = `${patient.patient_first_name || ''} ${patient.patient_last_name || ''}`.trim() || 'Unknown';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-8 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-teal-600 to-cyan-600 text-white p-6 rounded-t-lg flex justify-between items-center">
@@ -354,29 +364,19 @@ export const PatientDetails = ({
           )}
 
 
-          {/* Notes and Comments */}
-          {(patient.notes || patient.comments) && (
+          {/* Comments */}
+          {patient.comments && (
             <section className="bg-gray-50 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <FiFileText className="text-teal-600" />
-                Notes & Comments
+                Comments
               </h3>
-              {patient.notes && (
-                <div className="mb-4">
-                  <label className="text-sm font-medium text-gray-600">Notes</label>
-                  <div className="mt-2 p-3 bg-white rounded border border-gray-200">
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{patient.notes}</p>
-                  </div>
-                </div>
-              )}
-              {patient.comments && (
                 <div>
                   <label className="text-sm font-medium text-gray-600">Comments</label>
                   <div className="mt-2 p-3 bg-white rounded border border-gray-200">
                     <p className="text-sm text-gray-700 whitespace-pre-wrap">{patient.comments}</p>
                   </div>
                 </div>
-              )}
             </section>
           )}
         </div>

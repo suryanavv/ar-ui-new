@@ -105,23 +105,34 @@ export const Dashboard = () => {
     }).format(amount);
   };
 
-  // Normalize aging buckets by grouping case-insensitively
+  // Normalize aging buckets by grouping case-insensitively and handling dash variations
   const normalizeAgingBuckets = (buckets: Array<{ bucket: string; count: number; total_amount: number }>) => {
     const normalizedMap = new Map<string, { bucket: string; count: number; total_amount: number }>();
     
     buckets.forEach(item => {
-      // Normalize bucket name to lowercase for comparison, but keep original format for display
-      const normalizedKey = item.bucket.toLowerCase().trim();
+      // Normalize: lowercase, replace en-dash/em-dash with hyphen, trim
+      const normalizeKey = (bucket: string): string => {
+        if (!bucket) return 'unknown';
+        // Replace en-dash (U+2013) and em-dash (U+2014) with regular hyphen
+        return bucket.replace(/\u2013/g, '-').replace(/\u2014/g, '-').toLowerCase().trim();
+      };
+      
+      const normalizedKey = normalizeKey(item.bucket);
       const existing = normalizedMap.get(normalizedKey);
       
       if (existing) {
-        // Merge: combine counts and amounts, keep the first bucket's display format
+        // Merge: combine counts and amounts
         existing.count += item.count;
         existing.total_amount += item.total_amount;
       } else {
-        // First occurrence: use original bucket name format
+        // First occurrence: use normalized format for consistency
+        // Capitalize "Days" for better display
+        let displayName = normalizeKey(item.bucket);
+        if (displayName.includes('days')) {
+          displayName = displayName.replace('days', 'Days');
+        }
         normalizedMap.set(normalizedKey, {
-          bucket: item.bucket.trim(), // Keep original format but trim whitespace
+          bucket: displayName,
           count: item.count,
           total_amount: item.total_amount
         });

@@ -270,41 +270,136 @@ export const PatientDetails = ({
           )}
 
           {/* Insurance Information */}
-          {(patient.individual_oop_max || patient.individual_oop_remaining) && (
+          {(patient.insurance || patient.network_status || patient.eligibility_status) && (
             <section className="bg-gray-50 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <FiShield className="text-teal-600" />
                 Insurance Information
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-gray-900 font-medium">
-                    Ind OOP- {formatCurrency(patient.individual_oop_max)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-gray-900 font-medium">
-                    Rem - {formatCurrency(patient.individual_oop_remaining)}
-                  </p>
-                </div>
+                {patient.insurance && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Insurance</label>
+                    <p className="text-gray-900">{patient.insurance}</p>
+                  </div>
+                )}
+                {patient.network_status && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Network Status</label>
+                    <p className="text-gray-900">
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        patient.network_status === 'In Network' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {patient.network_status}
+                      </span>
+                    </p>
+                  </div>
+                )}
+                {patient.eligibility_status && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Eligibility Status</label>
+                    <p className="text-gray-900">
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        patient.eligibility_status === 'Active' 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {patient.eligibility_status}
+                      </span>
+                    </p>
+                  </div>
+                )}
               </div>
             </section>
           )}
 
+          {/* Coverage Details */}
+          {(patient.family_deductible || patient.family_deductible_remaining || patient.copay || 
+            patient.coinsurance || patient.coverage_notes || patient.coverage_effective_from || 
+            patient.coverage_effective_to) && (
+            <section className="bg-gray-50 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <FiShield className="text-teal-600" />
+                Coverage Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                {patient.family_deductible && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Family Deductible</label>
+                    <p className="text-gray-900">{formatCurrency(patient.family_deductible)}</p>
+                  </div>
+                )}
+                {patient.family_deductible_remaining && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Family Deductible Remaining</label>
+                    <p className="text-gray-900">{formatCurrency(patient.family_deductible_remaining)}</p>
+                  </div>
+                )}
+                {patient.individual_oop_max && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Individual OOP Max</label>
+                    <p className="text-gray-900">{formatCurrency(patient.individual_oop_max)}</p>
+                  </div>
+                )}
+                {patient.individual_oop_remaining && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Individual OOP Remaining</label>
+                    <p className="text-gray-900">{formatCurrency(patient.individual_oop_remaining)}</p>
+                  </div>
+                )}
+                {patient.copay && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Copay</label>
+                    <p className="text-gray-900">{formatCurrency(patient.copay)}</p>
+                  </div>
+                )}
+                {patient.coinsurance && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Coinsurance</label>
+                    <p className="text-gray-900">{patient.coinsurance}</p>
+                  </div>
+                )}
+                {patient.coverage_effective_from && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Coverage Effective From</label>
+                    <p className="text-gray-900">{formatDate(patient.coverage_effective_from)}</p>
+                  </div>
+                )}
+                {patient.coverage_effective_to && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-600">Coverage Effective To</label>
+                    <p className="text-gray-900">
+                      {patient.coverage_effective_to ? formatDate(patient.coverage_effective_to) : 'Present'}
+                    </p>
+                  </div>
+                )}
+              </div>
+              {patient.coverage_notes && (
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Coverage Notes</label>
+                  <div className="mt-2 p-3 bg-white rounded border border-gray-200">
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{patient.coverage_notes}</p>
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Comments */}
-          {patient.comments && (
+          {patient.comments && patient.comments.trim() && (
             <section className="bg-gray-50 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <FiFileText className="text-teal-600" />
                 Comments
               </h3>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Comments</label>
-                  <div className="mt-2 p-3 bg-white rounded border border-gray-200">
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{patient.comments}</p>
-                  </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600">Comments</label>
+                <div className="mt-2 p-3 bg-white rounded border border-gray-200">
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{patient.comments}</p>
                 </div>
+              </div>
             </section>
           )}
         </div>

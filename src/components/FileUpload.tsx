@@ -9,22 +9,58 @@ interface FileUploadProps {
 export const FileUpload = ({ onUpload, loading }: FileUploadProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const validateFile = (file: File): boolean => {
+    const validExtensions = ['.csv', '.xlsx', '.xls'];
+    const isValid = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    
+    if (!isValid) {
+      alert('Please select a CSV, XLSX, or XLS file');
+      return false;
+    }
+    return true;
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const validExtensions = ['.csv', '.xlsx', '.xls'];
-      const isValid = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-      
-      if (!isValid) {
-        alert('Please select a CSV, XLSX, or XLS file');
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-        return;
+      if (validateFile(file)) {
+        setSelectedFile(file);
+      } else if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-      
-      setSelectedFile(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!loading) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (loading) {
+      return;
+    }
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      if (validateFile(file)) {
+        setSelectedFile(file);
+      }
     }
   };
 
@@ -47,7 +83,16 @@ export const FileUpload = ({ onUpload, loading }: FileUploadProps) => {
 
   return (
     <div className="w-full">
-      <div className="bg-gradient-to-br from-teal-50 via-cyan-50 to-teal-50 rounded-2xl border-2 border-dashed border-teal-700 hover:border-teal-600 hover:shadow-xl transition-all duration-300 backdrop-blur-sm">
+      <div 
+        className={`bg-gradient-to-br from-teal-50 via-cyan-50 to-teal-50 rounded-2xl border-2 border-dashed transition-all duration-300 backdrop-blur-sm ${
+          isDragging 
+            ? 'border-teal-600 border-solid bg-teal-100 shadow-xl' 
+            : 'border-teal-700 hover:border-teal-600 hover:shadow-xl'
+        } ${loading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <div className="px-8 py-12 text-center">
           <div className="flex flex-col items-center gap-4">
             <div className={`p-4 rounded-full ${loading ? 'bg-gray-100' : 'bg-teal-50'} transition-colors`}>

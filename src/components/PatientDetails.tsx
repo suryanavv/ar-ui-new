@@ -198,16 +198,16 @@ export const PatientDetails = ({
     return null;
   }
 
-  const fullName = `${patient.patient_first_name || ''} ${patient.patient_last_name || ''}`.trim() || 'Unknown';
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-8 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-gradient-to-r from-teal-600 to-cyan-600 text-white p-6 rounded-t-lg flex justify-between items-center">
           <div>
-            <h2 className="text-2xl font-bold">{fullName}</h2>
-            <p className="text-teal-100 text-sm mt-1">Invoice #{patient.invoice_number}</p>
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <FiUser />
+              Patient Information
+            </h2>
           </div>
           <button
             onClick={onClose}
@@ -270,96 +270,24 @@ export const PatientDetails = ({
           )}
 
           {/* Insurance Information */}
-          {(patient.insurance || patient.network_status || patient.eligibility_status) && (
+          {(patient.individual_oop_max || patient.individual_oop_remaining) && (
             <section className="bg-gray-50 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <FiShield className="text-teal-600" />
                 Insurance Information
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Insurance</label>
-                  <p className="text-gray-900">{patient.insurance || '-'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Network Status</label>
-                  <p className="text-gray-900">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      patient.network_status === 'In Network' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {patient.network_status || '-'}
-                    </span>
+                  <p className="text-gray-900 font-medium">
+                    Ind OOP- {formatCurrency(patient.individual_oop_max)}
                   </p>
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-gray-600">Eligibility Status</label>
-                  <p className="text-gray-900">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      patient.eligibility_status === 'Active' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {patient.eligibility_status || '-'}
-                    </span>
+                  <p className="text-gray-900 font-medium">
+                    Rem - {formatCurrency(patient.individual_oop_remaining)}
                   </p>
                 </div>
               </div>
-            </section>
-          )}
-
-          {/* Coverage Details */}
-          {(patient.coverage_notes || patient.family_deductible || patient.copay) && (
-            <section className="bg-gray-50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <FiShield className="text-teal-600" />
-                Coverage Details
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Family Deductible</label>
-                  <p className="text-gray-900">{formatCurrency(patient.family_deductible)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Family Deductible Remaining</label>
-                  <p className="text-gray-900">{formatCurrency(patient.family_deductible_remaining)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Individual OOP Max</label>
-                  <p className="text-gray-900">{formatCurrency(patient.individual_oop_max)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Individual OOP Remaining</label>
-                  <p className="text-gray-900">{formatCurrency(patient.individual_oop_remaining)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Copay</label>
-                  <p className="text-gray-900">{formatCurrency(patient.copay)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Coinsurance</label>
-                  <p className="text-gray-900">{patient.coinsurance || '-'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Coverage Effective From</label>
-                  <p className="text-gray-900">{formatDate(patient.coverage_effective_from)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Coverage Effective To</label>
-                  <p className="text-gray-900">
-                    {patient.coverage_effective_to ? formatDate(patient.coverage_effective_to) : 'Present'}
-                  </p>
-                </div>
-              </div>
-              {patient.coverage_notes && (
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Coverage Notes</label>
-                  <div className="mt-2 p-3 bg-white rounded border border-gray-200">
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{patient.coverage_notes}</p>
-                  </div>
-                </div>
-              )}
             </section>
           )}
 

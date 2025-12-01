@@ -17,7 +17,7 @@ import {
   ToastContainer,
   useToast
 } from './components';
-import { triggerBatchCall, callPatient, getCallStatus } from './services/api';
+import { triggerBatchCall, callPatient } from './services/api';
 import { usePatientData } from './hooks/usePatientData';
 import { useFileUpload } from './hooks/useFileUpload';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
@@ -52,6 +52,7 @@ function App() {
   const {
     patients,
     loading,
+    patientsRef,
     selectedUploadIdRef,
     loadPatientData,
     setSelectedUploadId: setSelectedUploadIdRef,
@@ -409,18 +410,20 @@ function App() {
           const singleCallRefreshInterval = setInterval(async () => {
             if (activeSection === 'upload' && refreshCount < maxRefreshes) {
               try {
-                // Always refresh patient data to get latest call status and notes
+                // Refresh patient data to get latest call status and notes
                 const currentUploadId = getSelectedUploadId();
                 await loadPatientData(currentUploadId, true);
                 
-                // Also check call status API for faster detection
-                const statusResponse = await getCallStatus([patient.phone_number]);
-                
-                if (statusResponse.success && statusResponse.statuses.length > 0) {
-                  const status = statusResponse.statuses[0];
-                  const callStatus = status.recent_call_status || status.call_status;
+                // Check call_status from patient data
+                const currentPatients = patientsRef.current;
+                const updatedPatient = currentPatients.find((p: Patient) => 
+                  p.phone_number === patient.phone_number &&
+                  p.invoice_number === patient.invoice_number &&
+                  p.patient_first_name === patient.patient_first_name &&
+                  p.patient_last_name === patient.patient_last_name
+                );
                   
-                  if (callStatus === 'completed' || callStatus === 'failed') {
+                if (updatedPatient && (updatedPatient.call_status === 'completed' || updatedPatient.call_status === 'failed')) {
                     // Remove from activeCalls when call completes or fails
                     setActiveCalls(prev => {
                       const newMap = new Map(prev);
@@ -429,21 +432,11 @@ function App() {
                     });
                     activeCallsRef.current = new Map(Array.from(activeCallsRef.current).filter(([key]) => key !== callKey));
                     
-                    // Final refresh to ensure UI is updated
-                    await loadPatientData(currentUploadId, true);
                     clearInterval(singleCallRefreshInterval);
                     return;
-                  }
                 }
               } catch (error) {
-                console.error('Failed to check call status:', error);
-                // Still try to refresh patient data on error
-                try {
-                  const currentUploadId = getSelectedUploadId();
-                  await loadPatientData(currentUploadId, true);
-                } catch (refreshError) {
-                  console.error('Failed to refresh patient data:', refreshError);
-                }
+                console.error('Failed to refresh patient data:', error);
               }
               
               refreshCount++;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getFileUploadHistory, getPatientsByUploadId, callPatient, getCallStatus } from '../services/api';
+import { getFileUploadHistory, getPatientsByUploadId, callPatient } from '../services/api';
 import type { Patient } from '../types';
 import { formatDateTime } from '../utils/timezone';
 import { PatientTable } from './PatientTable';
@@ -220,32 +220,27 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
         const singleCallRefreshInterval = setInterval(async () => {
           if (refreshCount < maxRefreshes) {
             try {
-              // Always reload patients to get latest call status and notes
+              // Reload patients to get latest call status and notes
               if (selectedUploadId) {
                 const response = await getPatientsByUploadId(selectedUploadId);
-                setPatients(response.patients || []);
-              }
-              
-              // Also check call status API for faster detection
-              const statusResponse = await getCallStatus([phoneNumber]);
-              
-              if (statusResponse.success && statusResponse.statuses.length > 0) {
-                const status = statusResponse.statuses[0];
-                const callStatus = status.recent_call_status || status.call_status;
+                const updatedPatients = response.patients || [];
+                setPatients(updatedPatients);
                 
-                if (callStatus === 'completed' || callStatus === 'failed') {
+                // Check call_status from patient data
+                const patient = updatedPatients.find(p => 
+                  p.phone_number === phoneNumber &&
+                  p.invoice_number === patientToCall.invoice_number &&
+                  p.patient_first_name === patientToCall.patient_first_name &&
+                  p.patient_last_name === patientToCall.patient_last_name
+                );
+                
+                if (patient && (patient.call_status === 'completed' || patient.call_status === 'failed')) {
                   // Remove from activeCalls when call completes or fails
                   setActiveCalls(prev => {
                     const newMap = new Map(prev);
                     newMap.delete(callKey);
                     return newMap;
                   });
-                  
-                  // Final reload to ensure UI is updated
-                  if (selectedUploadId) {
-                    const response = await getPatientsByUploadId(selectedUploadId);
-                    setPatients(response.patients || []);
-                  }
                   
                   clearInterval(singleCallRefreshInterval);
                   return;

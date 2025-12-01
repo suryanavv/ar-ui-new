@@ -69,15 +69,8 @@ export const uploadCSV = async (file: File) => {
   return response.data;
 };
 
-// Get data from a specific CSV file (now uses database, filename is for backward compatibility)
-export const getCSVData = async (filename: string, includeOutput: boolean = true): Promise<{ success: boolean; filename: string; count: number; patients: Patient[] }> => {
-  const response = await api.get(`/csv-data/${filename}`, {
-    params: { include_output: includeOutput }
-  });
-  return response.data;
-};
 
-// Get patient details by ID or patient identifiers
+// Get patient details by ID or patient identifiers (uses unified /patients endpoint)
 export const getPatientDetails = async (
   invoiceId?: number,
   phoneNumber?: string,
@@ -102,7 +95,8 @@ export const getPatientDetails = async (
     params.patient_last_name = patientLastName;
   }
   
-  const response = await api.get('/patients/details', { params });
+  // Use unified /patients endpoint - returns single patient when detail params are provided
+  const response = await api.get('/patients', { params });
   return response.data;
 };
 
@@ -128,8 +122,8 @@ export interface FileUploadItem {
 
 // Get list of available CSV files - returns all uploads with formatted display names
 export const getAvailableFiles = async (): Promise<{ success: boolean; files: Array<{ id: number; filename: string; displayName: string; uploaded_at: string | null; patient_count: number }>; count: number }> => {
-  // Use /files/list and return all uploads with formatted display names
-  const response = await api.get<{ success: boolean; history: FileUploadItem[]; count: number }>('/files/list');
+  // Use unified /files endpoint - returns history when no upload_id is provided
+  const response = await api.get<{ success: boolean; history: FileUploadItem[]; count: number }>('/files');
   const history = response.data.history || [];
   
   // Format display name with date and time in system timezone
@@ -282,32 +276,23 @@ export const getDashboardStats = async (): Promise<{
   return response.data;
 };
 
-// Get file list with upload dates
-export const getFileListWithDates = async (): Promise<{ success: boolean; files: Array<{ filename: string; upload_date: string | null; patient_count: number; new_count?: number; updated_count?: number; error_count?: number; upload_id?: number }>; count: number }> => {
-  const response = await api.get('/files/list');
-  return response.data;
-};
 
-// Get file upload history
+// Get file upload history (uses unified /files endpoint)
 export const getFileUploadHistory = async (): Promise<{ success: boolean; history: Array<{ id: number; filename: string; uploaded_at: string | null; patient_count: number; new_count: number; updated_count: number; error_count: number; created_at: string | null }>; count: number }> => {
-  // Use /files/list which returns history
-  const response = await api.get('/files/list');
+  // Use unified /files endpoint - returns history when no upload_id is provided
+  const response = await api.get('/files');
   return response.data;
 };
 
-// Get patients by upload ID
+// Get patients by upload ID (uses unified /files endpoint)
 export const getPatientsByUploadId = async (uploadId: number): Promise<{ success: boolean; filename: string; uploaded_at: string | null; count: number; patients: Patient[]; upload_stats: { patient_count: number; new_count: number; updated_count: number; error_count: number } }> => {
-  const response = await api.get(`/upload/${uploadId}/patients`);
-  return response.data;
-};
-
-// Get CSV data with option to filter by original source
-export const getCSVDataByOriginal = async (filename: string, includeOutput: boolean = true): Promise<{ success: boolean; filename: string; count: number; patients: Patient[] }> => {
-  const response = await api.get(`/csv-data/${filename}`, {
-    params: { include_output: includeOutput, filter_by_original: true }
+  // Use unified /files endpoint - returns patients when upload_id is provided
+  const response = await api.get('/files', {
+    params: { upload_id: uploadId }
   });
   return response.data;
 };
+
 
 // Get calls grouped by date for calendar
 export const getCallsByDate = async (startDate?: string, endDate?: string): Promise<{ calls_by_date: Record<string, Array<{ patient_first_name: string; patient_last_name: string; invoice_number: string; called_at: string; call_status: string; outstanding_amount: number }>> }> => {
@@ -318,26 +303,6 @@ export const getCallsByDate = async (startDate?: string, endDate?: string): Prom
   return response.data;
 };
 
-// Get call status for specific phone numbers (lightweight endpoint)
-export const getCallStatus = async (phoneNumbers: string[]): Promise<{
-  success: boolean;
-  statuses: Array<{
-    phone_number: string;
-    invoice_number: string | null;
-    call_status: string | null;
-    last_called_at: string | null;
-    recent_call_status: string | null;
-    recent_call_at: string | null;
-  }>;
-}> => {
-  if (phoneNumbers.length === 0) {
-    return { success: true, statuses: [] };
-  }
-  const response = await api.get('/call-status', {
-    params: { phone_numbers: phoneNumbers.join(',') }
-  });
-  return response.data;
-};
 
 // User Management APIs
 export const getUsers = async (): Promise<{ success: boolean; users: Array<{

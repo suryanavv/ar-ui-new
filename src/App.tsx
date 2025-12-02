@@ -212,6 +212,7 @@ function App() {
   const handleLogout = () => {
     stopAutoRefresh();
     localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
     localStorage.removeItem('currentFile');
     localStorage.removeItem('callingInProgress');

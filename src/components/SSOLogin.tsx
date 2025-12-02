@@ -41,8 +41,9 @@ export const SSOLogin = ({ onLogin }: SSOLoginProps) => {
 
         const data = await response.json();
 
-        // Store token and user in localStorage
+        // Store tokens and user in localStorage
         localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
         localStorage.setItem('user', JSON.stringify(data.user));
 
         // Call parent callback

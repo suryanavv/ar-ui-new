@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FiMail, FiLock, FiAlertCircle } from 'react-icons/fi';
 import logo from '../assets/favicon-32x32.png';
 import type { User } from '../types';
@@ -12,6 +12,17 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [sessionExpired, setSessionExpired] = useState(false);
+
+  useEffect(() => {
+    // Check if user was redirected due to session expiry
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('session_expired') === 'true') {
+      setSessionExpired(true);
+      // Clean up URL parameter
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,8 +46,9 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
 
       const data = await response.json();
       
-      // Store token in localStorage
+      // Store tokens in localStorage
       localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
       localStorage.setItem('user', JSON.stringify(data.user));
       
       // Call parent callback
@@ -64,6 +76,19 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
               Sign in to access the AR Dashboard
             </p>
           </div>
+
+          {/* Session Expiry Message */}
+          {sessionExpired && (
+            <div className="mb-6 p-4 bg-amber-50 border-l-4 border-amber-500 rounded-lg flex items-start gap-3">
+              <FiAlertCircle className="text-amber-500 flex-shrink-0 mt-0.5" size={20} />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Session Expired</p>
+                <p className="text-sm text-amber-700 mt-1">
+                  Your session has expired. Please log in again to continue.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Error Message */}
           {error && (

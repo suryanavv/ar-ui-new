@@ -61,6 +61,39 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
   };
 
   return (
+    <>
+      {/* Session Expired Modal */}
+      {sessionExpired && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 animate-in fade-in zoom-in duration-200">
+            <div className="flex flex-col items-center text-center">
+              {/* Icon */}
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
+                <FiAlertCircle className="text-amber-600" size={32} />
+              </div>
+              
+              {/* Title */}
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">
+                Session Expired
+              </h2>
+              
+              {/* Message */}
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Your session has timed out due to inactivity. For your security, please log in again to continue using the dashboard.
+              </p>
+              
+              {/* Button */}
+              <button
+                onClick={() => setSessionExpired(false)}
+                className="w-full py-3 px-6 bg-teal-700 text-white rounded-xl font-semibold hover:bg-teal-800 transition-colors"
+              >
+                Continue to Login
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-teal-50 to-cyan-50">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8">
@@ -76,19 +109,6 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
               Sign in to access the AR Dashboard
             </p>
           </div>
-
-          {/* Session Expiry Message */}
-          {sessionExpired && (
-            <div className="mb-6 p-4 bg-amber-50 border-l-4 border-amber-500 rounded-lg flex items-start gap-3">
-              <FiAlertCircle className="text-amber-500 flex-shrink-0 mt-0.5" size={20} />
-              <div>
-                <p className="text-sm font-semibold text-amber-800">Session Expired</p>
-                <p className="text-sm text-amber-700 mt-1">
-                  Your session has expired. Please log in again to continue.
-                </p>
-              </div>
-            </div>
-          )}
 
           {/* Error Message */}
           {error && (
@@ -159,5 +179,6 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
         </div>
       </div>
     </div>
+    </>
   );
 };

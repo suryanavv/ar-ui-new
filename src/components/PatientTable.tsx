@@ -1,5 +1,5 @@
 import type { Patient } from '../types';
-import { FiEye, FiPhone } from 'react-icons/fi';
+import { FiEye, FiPhone, FiPhoneOff } from 'react-icons/fi';
 import { parseNotes } from '../utils/notesParser';
 
 interface PatientTableProps {
@@ -7,12 +7,13 @@ interface PatientTableProps {
   loading: boolean;
   onViewNotes: (patient: Patient) => void;
   onCallPatient?: (patient: Patient) => void;
+  onEndCall?: (patient: Patient) => void;
   onViewCallHistory?: (patient: Patient) => void;
   onViewDetails?: (patient: Patient) => void;
-  activeCalls?: Map<string, number>;
+  activeCalls?: Map<string, { timestamp: number; conversationId?: string }>;
 }
 
-export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, onViewCallHistory, onViewDetails, activeCalls = new Map() }: PatientTableProps) => {
+export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, onEndCall, onViewCallHistory, onViewDetails, activeCalls = new Map() }: PatientTableProps) => {
   // Helper function to create unique key for each patient record (same as in InvoiceList)
   const getPatientCallKey = (patient: Patient): string => {
     const phone = patient.phone_number || '';
@@ -34,11 +35,18 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
     const callKey = getPatientCallKey(patient);
     if (!callKey || !activeCalls.has(callKey)) return false;
     
-    const timestamp = activeCalls.get(callKey)!;
+    const callData = activeCalls.get(callKey)!;
     const now = Date.now();
     // Consider call active only if initiated within last 5 minutes
     // After that, allow calling again (call likely completed)
-    return (now - timestamp) < 5 * 60 * 1000;
+    return (now - callData.timestamp) < 5 * 60 * 1000;
+  };
+
+  // Check if patient has an active call with conversation ID
+  const hasActiveCallWithConversation = (patient: Patient): boolean => {
+    const callKey = getPatientCallKey(patient);
+    const callData = activeCalls.get(callKey);
+    return !!(callData && callData.conversationId && isCallActive(patient));
   };
 
   // Check if invoice is paid (payment_status is completed)
@@ -358,6 +366,16 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                         </button>
                       )
                     )}
+                    {hasActiveCallWithConversation(patient) && onEndCall && (
+                      <button
+                        onClick={() => onEndCall(patient)}
+                        className="inline-flex items-center gap-1 px-2 py-1 border border-red-600 text-red-600 rounded text-xs font-semibold hover:bg-red-50 transition-colors"
+                        title="End call"
+                      >
+                        <FiPhoneOff size={12} />
+                        Disconnect
+                      </button>
+                    )}
                     {(patient.call_count || 0) > 0 && (
                       <button
                         onClick={() => onViewNotes(patient)}
@@ -609,6 +627,16 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                           Call
                         </button>
                       )
+                    )}
+                    {hasActiveCallWithConversation(patient) && onEndCall && (
+                      <button
+                        onClick={() => onEndCall(patient)}
+                        className="inline-flex items-center gap-1 px-2 py-1 border border-red-600 text-red-600 rounded text-[10px] font-semibold hover:bg-red-50 transition-colors"
+                        title="End call"
+                      >
+                        <FiPhoneOff size={10} />
+                        Disconnect
+                      </button>
                     )}
                     {(patient.call_count || 0) > 0 && (
                       <button

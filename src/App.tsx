@@ -18,7 +18,7 @@ import {
   ToastContainer,
   useToast
 } from './components';
-import { triggerBatchCall, callPatient } from './services/api';
+import { triggerBatchCall, callPatient, endCall } from './services/api';
 import { usePatientData } from './hooks/usePatientData';
 import { useFileUpload } from './hooks/useFileUpload';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
@@ -46,8 +46,8 @@ function App() {
   const [showPatientDetails, setShowPatientDetails] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [patientToCall, setPatientToCall] = useState<Patient | null>(null);
-  const [activeCalls, setActiveCalls] = useState<Map<string, number>>(new Map());
-  const activeCallsRef = useRef<Map<string, number>>(new Map());
+  const [activeCalls, setActiveCalls] = useState<Map<string, { timestamp: number; conversationId?: string }>>(new Map());
+  const activeCallsRef = useRef<Map<string, { timestamp: number; conversationId?: string }>>(new Map());
 
   // Custom hooks
   const {
@@ -310,9 +310,9 @@ function App() {
             
             if (patient) {
               const callKey = getPatientCallKey(patient);
-              newActiveCalls.set(callKey, now);
+              newActiveCalls.set(callKey, { timestamp: now, conversationId: call.conversation_id });
             } else {
-              newActiveCalls.set(call.phone_number, now);
+              newActiveCalls.set(call.phone_number, { timestamp: now, conversationId: call.conversation_id });
             }
           }
         });
@@ -396,7 +396,10 @@ function App() {
       if (response.success) {
         const callKey = getPatientCallKey(patient);
         const newActiveCalls = new Map(activeCalls);
-        newActiveCalls.set(callKey, Date.now());
+        newActiveCalls.set(callKey, { 
+          timestamp: Date.now(),
+          conversationId: response.conversation_id 
+        });
         setActiveCalls(newActiveCalls);
         activeCallsRef.current = newActiveCalls;
         
@@ -470,6 +473,48 @@ function App() {
       console.error('Call failed:', error);
       showMessage('error', err.response?.data?.detail || 'Failed to call patient');
       showToast('error', err.response?.data?.detail || 'Failed to call patient');
+    }
+  };
+
+  const handleEndCall = async (patient: Patient) => {
+    const callKey = getPatientCallKey(patient);
+    const activeCall = activeCalls.get(callKey);
+    
+    if (!activeCall || !activeCall.conversationId) {
+      showMessage('error', 'No active call found for this patient');
+      return;
+    }
+
+    try {
+      const fullName = getPatientFullName(patient);
+      showMessage('info', `Ending call with ${fullName}...`);
+      
+      const response = await endCall(activeCall.conversationId);
+      
+      if (response.success) {
+        // Remove from activeCalls
+        const newActiveCalls = new Map(activeCalls);
+        newActiveCalls.delete(callKey);
+        setActiveCalls(newActiveCalls);
+        activeCallsRef.current = newActiveCalls;
+        
+        showMessage('success', `Call ended with ${fullName}`);
+        showToast('success', `Call disconnected successfully`);
+        
+        // Refresh patient data to update call status
+        if (activeSection === 'upload') {
+          const currentUploadId = getSelectedUploadId();
+          await loadPatientData(currentUploadId, true);
+        }
+      } else {
+        showMessage('error', 'Failed to end call');
+        showToast('error', 'Failed to disconnect call');
+      }
+    } catch (error) {
+      const err = error as { response?: { data?: { detail?: string } } };
+      console.error('End call failed:', error);
+      showMessage('error', err.response?.data?.detail || 'Failed to end call');
+      showToast('error', err.response?.data?.detail || 'Failed to disconnect call');
     }
   };
 
@@ -569,6 +614,7 @@ function App() {
             onBatchCall={handleBatchCall}
                 onViewNotes={handleViewNotes}
                 onCallPatient={handleCallPatient}
+                onEndCall={handleEndCall}
                 onViewCallHistory={handleViewCallHistory}
                 onViewDetails={handleViewDetails}
               />

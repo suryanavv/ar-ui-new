@@ -4,8 +4,8 @@ interface UseAutoRefreshOptions {
   activeSection: 'dashboard' | 'upload' | 'invoice-list' | 'users' | 'patients';
   callingInProgress: boolean;
   setCallingInProgress: (value: boolean) => void;
-  setActiveCalls: React.Dispatch<React.SetStateAction<Map<string, number>>>;
-  activeCallsRef: React.MutableRefObject<Map<string, number>>;
+  setActiveCalls: React.Dispatch<React.SetStateAction<Map<string, { timestamp: number; conversationId?: string }>>>;
+  activeCallsRef: React.MutableRefObject<Map<string, { timestamp: number; conversationId?: string }>>;
   loadPatientData: (uploadId: number | null, silent: boolean) => Promise<void>;
   getSelectedUploadId: () => number | null;
 }
@@ -70,8 +70,8 @@ export const useAutoRefresh = (options: UseAutoRefreshOptions) => {
         const now = Date.now();
         const newActiveCalls = new Map(prevActiveCalls);
         
-        prevActiveCalls.forEach((timestamp, phone) => {
-          if (now - timestamp > 10 * 60 * 1000) {
+        prevActiveCalls.forEach((callInfo, phone) => {
+          if (now - callInfo.timestamp > 10 * 60 * 1000) {
             newActiveCalls.delete(phone);
           }
         });

@@ -18,13 +18,14 @@ interface UploadSectionProps {
   loading: boolean;
   uploadLoading: boolean;
   callingInProgress: boolean;
-  activeCalls: Map<string, number>;
+  activeCalls: Map<string, { timestamp: number; conversationId?: string }>;
   currentFile: string;
   onFileUpload: (file: File) => Promise<void>;
   onFileSelect: (uploadId: number | null) => Promise<void>;
   onBatchCall: () => void;
   onViewNotes: (patient: Patient) => void;
   onCallPatient: (patient: Patient) => void;
+  onEndCall: (patient: Patient) => void;
   onViewCallHistory: (patient: Patient) => void;
   onViewDetails: (patient: Patient) => void;
 }
@@ -45,6 +46,7 @@ export const UploadSection = ({
   onBatchCall,
   onViewNotes,
   onCallPatient,
+  onEndCall,
   onViewCallHistory,
   onViewDetails,
 }: UploadSectionProps) => {
@@ -375,6 +377,7 @@ export const UploadSection = ({
           loading={loading} 
           onViewNotes={onViewNotes}
           onCallPatient={onCallPatient}
+          onEndCall={onEndCall}
           onViewCallHistory={onViewCallHistory}
           onViewDetails={onViewDetails}
           activeCalls={activeCalls}

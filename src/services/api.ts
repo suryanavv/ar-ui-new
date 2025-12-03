@@ -306,6 +306,16 @@ export const callPatient = async (
   return response.data;
 };
 
+// End an active call by conversation ID
+export const endCall = async (conversationId: string): Promise<{
+  success: boolean;
+  message: string;
+  conversation_id?: string;
+}> => {
+  const response = await api.post(`/end-call/${conversationId}`);
+  return response.data;
+};
+
 // Get call history for a patient
 export const getCallHistory = async (phoneNumber: string, invoiceNumber?: string): Promise<{
   success: boolean;

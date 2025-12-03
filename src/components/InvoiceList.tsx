@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getFileUploadHistory, getPatientsByUploadId, callPatient } from '../services/api';
+import { getFileUploadHistory, getPatientsByUploadId, callPatient, endCall } from '../services/api';
 import type { Patient } from '../types';
 import { formatDateTime } from '../utils/timezone';
 import { PatientTable } from './PatientTable';
@@ -35,7 +35,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
   const [showPatientDetailsModal, setShowPatientDetailsModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [patientToCall, setPatientToCall] = useState<Patient | null>(null);
-  const [activeCalls, setActiveCalls] = useState<Map<string, number>>(new Map());
+  const [activeCalls, setActiveCalls] = useState<Map<string, { timestamp: number; conversationId?: string }>>(new Map());
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
 
@@ -171,6 +171,52 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
     return `${phone}|${invoice}|${firstName}|${lastName}`;
   };
 
+  const handleEndCall = async (patient: Patient) => {
+    const callKey = getPatientCallKey(patient);
+    const activeCall = activeCalls.get(callKey);
+    
+    if (!activeCall || !activeCall.conversationId) {
+      showMessage('error', 'No active call found for this patient');
+      return;
+    }
+
+    try {
+      const getFullName = (p: Patient): string => {
+        const first = p.patient_first_name || '';
+        const last = p.patient_last_name || '';
+        return `${first} ${last}`.trim() || 'Unknown';
+      };
+      
+      const fullName = getFullName(patient);
+      showMessage('info', `Ending call with ${fullName}...`);
+      
+      const response = await endCall(activeCall.conversationId);
+      
+      if (response.success) {
+        // Remove from activeCalls
+        setActiveCalls(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(callKey);
+          return newMap;
+        });
+        
+        showMessage('success', `Call ended with ${fullName}`);
+        
+        // Refresh patient data to update call status
+        if (selectedUploadId) {
+          const response = await getPatientsByUploadId(selectedUploadId);
+          setPatients(response.patients || []);
+        }
+      } else {
+        showMessage('error', 'Failed to end call');
+      }
+    } catch (error) {
+      console.error('End call failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to end call';
+      showMessage('error', errorMessage);
+    }
+  };
+
   const confirmCallPatient = async () => {
     if (!patientToCall) {
       setShowCallConfirmModal(false);
@@ -185,7 +231,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
       const now = Date.now();
       setActiveCalls(prev => {
         const newMap = new Map(prev);
-        newMap.set(callKey, now);
+        newMap.set(callKey, { timestamp: now, conversationId: result.conversation_id });
         return newMap;
       });
 
@@ -361,6 +407,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
                 loading={false}
                 onViewNotes={handleViewNotes}
                 onCallPatient={handleCallPatient}
+                onEndCall={handleEndCall}
                 onViewCallHistory={handleViewCallHistory}
                 onViewDetails={handleViewDetails}
                 activeCalls={activeCalls}

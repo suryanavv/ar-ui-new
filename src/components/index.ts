@@ -7,6 +7,7 @@ export { BatchCallButton } from './BatchCallButton';
 export { DownloadButton } from './DownloadButton';
 export { PatientTable } from './PatientTable';
 export { PatientDetails } from './PatientDetails';
+export { PatientsTab } from './PatientsTab';
 export { ConfirmModal } from './ConfirmModal';
 export { NotesModal } from './NotesModal';
 export { CallHistoryModal } from './CallHistoryModal';

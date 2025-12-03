@@ -1,7 +1,7 @@
 interface NavigationTabsProps {
-  activeSection: 'dashboard' | 'upload' | 'invoice-list' | 'users';
+  activeSection: 'dashboard' | 'upload' | 'invoice-list' | 'patients' | 'users';
   isAdmin: boolean;
-  onSectionChange: (section: 'dashboard' | 'upload' | 'invoice-list' | 'users') => void;
+  onSectionChange: (section: 'dashboard' | 'upload' | 'invoice-list' | 'patients' | 'users') => void;
 }
 
 export const NavigationTabs = ({ activeSection, isAdmin, onSectionChange }: NavigationTabsProps) => {
@@ -57,6 +57,23 @@ export const NavigationTabs = ({ activeSection, isAdmin, onSectionChange }: Navi
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             Invoice List
+          </div>
+        </button>
+        <button
+          onClick={() => {
+            onSectionChange('patients');
+          }}
+          className={`flex-1 px-6 py-4 font-semibold text-sm transition-colors ${
+            activeSection === 'patients'
+              ? 'text-teal-600 border-b-2 border-teal-600 bg-teal-50'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+        >
+          <div className="flex items-center justify-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            Patients
           </div>
         </button>
         {isAdmin && (

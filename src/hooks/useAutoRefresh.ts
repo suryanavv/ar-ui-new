@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 
 interface UseAutoRefreshOptions {
-  activeSection: 'dashboard' | 'upload' | 'invoice-list' | 'users';
+  activeSection: 'dashboard' | 'upload' | 'invoice-list' | 'users' | 'patients';
   callingInProgress: boolean;
   setCallingInProgress: (value: boolean) => void;
   setActiveCalls: React.Dispatch<React.SetStateAction<Map<string, number>>>;

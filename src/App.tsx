@@ -14,6 +14,7 @@ import {
   Dashboard,
   InvoiceList,
   UserManagement,
+  PatientsTab,
   ToastContainer,
   useToast
 } from './components';
@@ -35,7 +36,7 @@ function App() {
   const [currentFile, setCurrentFile] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [selectedUploadId, setSelectedUploadId] = useState<number | null>(null);
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'upload' | 'invoice-list' | 'users'>('dashboard');
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'upload' | 'invoice-list' | 'patients' | 'users'>('dashboard');
   const [message, setMessage] = useState<Message | null>(null);
   const [callingInProgress, setCallingInProgress] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -145,8 +146,8 @@ function App() {
     }
     
     const storedActiveSection = localStorage.getItem('activeSection');
-    if (storedActiveSection && ['dashboard', 'upload', 'invoice-list', 'users'].includes(storedActiveSection)) {
-      setActiveSection(storedActiveSection as 'dashboard' | 'upload' | 'invoice-list' | 'users');
+    if (storedActiveSection && ['dashboard', 'upload', 'invoice-list', 'patients', 'users'].includes(storedActiveSection)) {
+      setActiveSection(storedActiveSection as 'dashboard' | 'upload' | 'invoice-list' | 'patients' | 'users');
     }
     
     selectedUploadIdRef.current = null;
@@ -472,7 +473,7 @@ function App() {
     }
   };
 
-  const handleSectionChange = (section: 'dashboard' | 'upload' | 'invoice-list' | 'users') => {
+  const handleSectionChange = (section: 'dashboard' | 'upload' | 'invoice-list' | 'patients' | 'users') => {
     if (section === 'dashboard') {
       stopAutoRefresh();
       setActiveSection('dashboard');
@@ -537,6 +538,17 @@ function App() {
         {activeSection === 'invoice-list' && (
           <div className="mb-8">
             <InvoiceList onFileSelect={() => {}} />
+          </div>
+        )}
+
+        {activeSection === 'patients' && (
+          <div className="mb-8">
+            <PatientsTab
+              onViewNotes={handleViewNotes}
+              onViewCallHistory={handleViewCallHistory}
+              onViewDetails={handleViewDetails}
+              showMessage={showMessage}
+            />
           </div>
         )}
 

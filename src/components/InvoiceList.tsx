@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getFileUploadHistory, getPatientsByUploadId, callPatient, endCall } from '../services/api';
+import { getFileUploadHistory, getPatientsByUploadId, callPatient, endCall, getCallStatus } from '../services/api';
 import type { Patient } from '../types';
 import { formatDateTime } from '../utils/timezone';
 import { PatientTable } from './PatientTable';
@@ -35,7 +35,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
   const [showPatientDetailsModal, setShowPatientDetailsModal] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [patientToCall, setPatientToCall] = useState<Patient | null>(null);
-  const [activeCalls, setActiveCalls] = useState<Map<string, { timestamp: number; conversationId?: string }>>(new Map());
+  const [activeCalls, setActiveCalls] = useState<Map<string, { timestamp: number; conversationId?: string; callSid?: string; twilioStatus?: string }>>(new Map());
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
 
 
@@ -253,6 +253,17 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
       );
       
       if (result.success) {
+        // Update active calls with call_sid
+        setActiveCalls(prev => {
+          const newMap = new Map(prev);
+          newMap.set(callKey, { 
+            timestamp: now,
+            conversationId: result.conversation_id,
+            callSid: (result as { call_sid?: string }).call_sid
+          });
+          return newMap;
+        });
+        
         showMessage('success', `Call initiated to ${fullName}`);
         // Reload patients to refresh call count and status
         if (selectedUploadId) {
@@ -260,71 +271,84 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
           setPatients(response.patients || []);
         }
         
-        // Poll for call status and remove from activeCalls when complete
-        let refreshCount = 0;
-        const maxRefreshes = 60; // Increased to allow more time for calls to complete
-        const singleCallRefreshInterval = setInterval(async () => {
-          if (refreshCount < maxRefreshes) {
-            try {
-              // Reload patients to get latest call status and notes
-              if (selectedUploadId) {
-                const response = await getPatientsByUploadId(selectedUploadId);
-                const updatedPatients = response.patients || [];
-                setPatients(updatedPatients);
+        // Start polling call status using the new endpoint
+        if ((result as { call_sid?: string }).call_sid) {
+          const callSid = (result as { call_sid?: string }).call_sid!;
+          let refreshCount = 0;
+          const maxRefreshes = 60; // Max 3 minutes (60 * 3s)
+          
+          const singleCallRefreshInterval = setInterval(async () => {
+            if (refreshCount < maxRefreshes) {
+              try {
+                // Check real-time call status from Twilio/ElevenLabs
+                const statusResponse = await getCallStatus(callSid);
                 
-                // Check call_status from patient data
-                const patient = updatedPatients.find(p => 
-                  p.phone_number === phoneNumber &&
-                  p.invoice_number === patientToCall.invoice_number &&
-                  p.patient_first_name === patientToCall.patient_first_name &&
-                  p.patient_last_name === patientToCall.patient_last_name
-                );
+                // Twilio statuses: queued, ringing, in-progress, completed, busy, failed, no-answer, canceled
+                const twilioStatus = statusResponse.twilio?.status;
+                const isCallComplete = twilioStatus && ['completed', 'busy', 'failed', 'no-answer', 'canceled'].includes(twilioStatus);
                 
-                if (patient && (patient.call_status === 'completed' || patient.call_status === 'failed')) {
-                  // Remove from activeCalls when call completes or fails
-                  setActiveCalls(prev => {
-                    const newMap = new Map(prev);
-                    newMap.delete(callKey);
-                    return newMap;
-                  });
-                  
-                  clearInterval(singleCallRefreshInterval);
-                  return;
+                if (isCallComplete) {
+                  // Call has ended - refresh patient data to get notes
+                  if (selectedUploadId) {
+                    const response = await getPatientsByUploadId(selectedUploadId);
+                    const updatedPatients = response.patients || [];
+                    setPatients(updatedPatients);
+                    
+                    // Check if notes are available
+                    const patient = updatedPatients.find(p => 
+                      p.phone_number === phoneNumber &&
+                      p.invoice_number === patientToCall.invoice_number &&
+                      p.patient_first_name === patientToCall.patient_first_name &&
+                      p.patient_last_name === patientToCall.patient_last_name
+                    );
+                    
+                    if (patient?.recent_call_notes && patient.recent_call_notes.trim()) {
+                      // Notes are updated - stop polling and remove from activeCalls
+                      setActiveCalls(prev => {
+                        const newMap = new Map(prev);
+                        newMap.delete(callKey);
+                        return newMap;
+                      });
+                      clearInterval(singleCallRefreshInterval);
+                      return;
+                    }
+                    // If notes not updated yet, continue polling for a bit
+                  }
+                }
+              } catch (error) {
+                console.error('Failed to check call status:', error);
+                // Fallback to patient data refresh if status endpoint fails
+                try {
+                  if (selectedUploadId) {
+                    const response = await getPatientsByUploadId(selectedUploadId);
+                    setPatients(response.patients || []);
+                  }
+                } catch (refreshError) {
+                  console.error('Failed to refresh patient data:', refreshError);
                 }
               }
-            } catch (error) {
-              console.error('Failed to check call status:', error);
-              // Still try to reload patients on error
+              
+              refreshCount++;
+            } else {
+              // Max refreshes reached - clean up
+              setActiveCalls(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(callKey);
+                return newMap;
+              });
+              // Final reload
               try {
                 if (selectedUploadId) {
                   const response = await getPatientsByUploadId(selectedUploadId);
                   setPatients(response.patients || []);
                 }
-              } catch (refreshError) {
-                console.error('Failed to refresh patient data:', refreshError);
+              } catch (error) {
+                console.error('Failed to refresh patient data:', error);
               }
+              clearInterval(singleCallRefreshInterval);
             }
-            
-            refreshCount++;
-          } else {
-            // Clean up activeCalls when max refreshes reached
-            setActiveCalls(prev => {
-              const newMap = new Map(prev);
-              newMap.delete(callKey);
-              return newMap;
-            });
-            // Final reload before stopping
-            try {
-              if (selectedUploadId) {
-                const response = await getPatientsByUploadId(selectedUploadId);
-                setPatients(response.patients || []);
-              }
-            } catch (error) {
-              console.error('Failed to refresh patient data:', error);
-            }
-            clearInterval(singleCallRefreshInterval);
-          }
-        }, 3000); // Refresh every 3 seconds
+          }, 3000); // Poll every 3 seconds
+        }
       } else {
         showMessage('error', result.message || 'Failed to initiate call');
         // Remove from active calls on failure

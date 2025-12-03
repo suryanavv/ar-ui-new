@@ -10,7 +10,7 @@ interface PatientTableProps {
   onEndCall?: (patient: Patient) => void;
   onViewCallHistory?: (patient: Patient) => void;
   onViewDetails?: (patient: Patient) => void;
-  activeCalls?: Map<string, { timestamp: number; conversationId?: string }>;
+  activeCalls?: Map<string, { timestamp: number; conversationId?: string; callSid?: string; twilioStatus?: string }>;
 }
 
 export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, onEndCall, onViewCallHistory, onViewDetails, activeCalls = new Map() }: PatientTableProps) => {
@@ -23,30 +23,91 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
     return `${phone}|${invoice}|${firstName}|${lastName}`;
   };
 
-  // Check if call is currently active (only for the first 5 minutes after initiation)
-  // This allows users to call again after the call completes
-  // Also checks patient's call_status to avoid showing "Calling..." for completed/failed calls
+  // Check if call is currently active (shows "Calling..." button)
+  // Uses real-time Twilio status to determine if call is active
   const isCallActive = (patient: Patient): boolean => {
-    // If call is already completed or failed, don't show "Calling..."
-    if (patient.call_status === 'completed' || patient.call_status === 'failed') {
-      return false;
-    }
-    
     const callKey = getPatientCallKey(patient);
     if (!callKey || !activeCalls.has(callKey)) return false;
     
     const callData = activeCalls.get(callKey)!;
+    
+    // Check real-time Twilio status if available
+    if (callData.twilioStatus) {
+      // Show "Calling..." for: queued, ringing, in-progress
+      // Hide for: completed, busy, failed, no-answer, canceled
+      const callIsActive = !['completed', 'busy', 'failed', 'no-answer', 'canceled'].includes(callData.twilioStatus);
+      return callIsActive;
+    }
+    
+    // Fallback: If no Twilio status yet, check time and database status
     const now = Date.now();
-    // Consider call active only if initiated within last 5 minutes
-    // After that, allow calling again (call likely completed)
-    return (now - callData.timestamp) < 5 * 60 * 1000;
+    const timeSinceCall = now - callData.timestamp;
+    
+    // Don't show "Calling..." if database already shows completed/failed
+    if (patient.call_status === 'completed' || patient.call_status === 'failed') {
+      return false;
+    }
+    
+    // Consider call active if initiated within last 5 minutes
+    return timeSinceCall < 5 * 60 * 1000;
   };
 
-  // Check if patient has an active call with conversation ID
-  const hasActiveCallWithConversation = (patient: Patient): boolean => {
+  // Check if disconnect button should be visible (including post-call processing time)
+  // Button stays visible while call is active OR during post-call processing
+  const shouldShowDisconnectButton = (patient: Patient): boolean => {
     const callKey = getPatientCallKey(patient);
     const callData = activeCalls.get(callKey);
-    return !!(callData && callData.conversationId && isCallActive(patient));
+    
+    // No call data - don't show button
+    if (!callData) return false;
+    
+    const now = Date.now();
+    const timeSinceCall = now - callData.timestamp;
+    
+    // Keep button visible for up to 10 minutes (enough time for post-call processing)
+    if (timeSinceCall > 10 * 60 * 1000) {
+      return false; // More than 10 minutes - hide button
+    }
+    
+    // Show button as long as we have call data (activeCalls entry exists)
+    // This ensures button is visible during entire call + post-call processing
+    return true;
+  };
+
+  // Check if disconnect button should be disabled
+  // Disable ONLY when call has ended (based on real-time Twilio status)
+  const isDisconnectButtonDisabled = (patient: Patient): boolean => {
+    const callKey = getPatientCallKey(patient);
+    const callData = activeCalls.get(callKey);
+    
+    if (!callData) return false;
+    
+    // Check real-time Twilio status if available
+    if (callData.twilioStatus) {
+      const twilioStatus = callData.twilioStatus;
+      
+      // Disable if call has ended (completed, failed, busy, no-answer, canceled)
+      // Enable for: queued, ringing, in-progress
+      const callHasEnded = ['completed', 'busy', 'failed', 'no-answer', 'canceled'].includes(twilioStatus);
+      return callHasEnded;
+    }
+    
+    // Fallback: If no Twilio status yet, check database status
+    // But keep enabled for first 10 seconds (call initiating)
+    const now = Date.now();
+    const timeSinceCall = now - callData.timestamp;
+    
+    if (timeSinceCall < 10000) {
+      return false; // Keep enabled while call is initiating
+    }
+    
+    // If database shows completed/failed after 10 seconds, disable
+    if (patient.call_status === 'completed' || patient.call_status === 'failed') {
+      return true;
+    }
+    
+    // Otherwise, keep button enabled
+    return false;
   };
 
   // Check if invoice is paid (payment_status is completed)
@@ -366,14 +427,19 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                         </button>
                       )
                     )}
-                    {hasActiveCallWithConversation(patient) && onEndCall && (
+                    {shouldShowDisconnectButton(patient) && onEndCall && (
                       <button
                         onClick={() => onEndCall(patient)}
-                        className="inline-flex items-center gap-1 px-2 py-1 border border-red-600 text-red-600 rounded text-xs font-semibold hover:bg-red-50 transition-colors"
-                        title="End call"
+                        disabled={isDisconnectButtonDisabled(patient)}
+                        className={`inline-flex items-center gap-1 px-2 py-1 border rounded text-xs font-semibold transition-colors ${
+                          isDisconnectButtonDisabled(patient)
+                            ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50'
+                            : 'border-red-600 text-red-600 hover:bg-red-50'
+                        }`}
+                        title={isDisconnectButtonDisabled(patient) ? "Processing post-call updates..." : "End call"}
                       >
                         <FiPhoneOff size={12} />
-                        Disconnect
+                        {isDisconnectButtonDisabled(patient) ? 'Processing...' : 'Disconnect'}
                       </button>
                     )}
                     {(patient.call_count || 0) > 0 && (
@@ -628,14 +694,19 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                         </button>
                       )
                     )}
-                    {hasActiveCallWithConversation(patient) && onEndCall && (
+                    {shouldShowDisconnectButton(patient) && onEndCall && (
                       <button
                         onClick={() => onEndCall(patient)}
-                        className="inline-flex items-center gap-1 px-2 py-1 border border-red-600 text-red-600 rounded text-[10px] font-semibold hover:bg-red-50 transition-colors"
-                        title="End call"
+                        disabled={isDisconnectButtonDisabled(patient)}
+                        className={`inline-flex items-center gap-1 px-2 py-1 border rounded text-[10px] font-semibold transition-colors ${
+                          isDisconnectButtonDisabled(patient)
+                            ? 'border-gray-300 text-gray-400 cursor-not-allowed bg-gray-50'
+                            : 'border-red-600 text-red-600 hover:bg-red-50'
+                        }`}
+                        title={isDisconnectButtonDisabled(patient) ? "Processing post-call updates..." : "End call"}
                       >
                         <FiPhoneOff size={10} />
-                        Disconnect
+                        {isDisconnectButtonDisabled(patient) ? 'Processing...' : 'Disconnect'}
                       </button>
                     )}
                     {(patient.call_count || 0) > 0 && (

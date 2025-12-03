@@ -306,6 +306,42 @@ export const callPatient = async (
   return response.data;
 };
 
+// Get real-time call status from Twilio and ElevenLabs
+export const getCallStatus = async (callSid: string): Promise<{
+  success: boolean;
+  call_sid: string;
+  twilio: {
+    success: boolean;
+    call_sid: string;
+    status: string; // queued, ringing, in-progress, completed, busy, failed, no-answer, canceled
+    duration: number | null;
+    start_time: string | null;
+    end_time: string | null;
+    direction: string;
+    from_number: string;
+    to_number: string;
+  } | null;
+  elevenlabs: {
+    success: boolean;
+    conversation_id: string;
+    status: string;
+    metadata: Record<string, unknown>;
+  } | null;
+  database: {
+    call_status: string;
+    conversation_id: string | null;
+    notes: string;
+    called_at: string | null;
+    patient_first_name: string;
+    patient_last_name: string;
+    invoice_number: string;
+    phone_number: string;
+  };
+}> => {
+  const response = await api.get(`/status/${callSid}`);
+  return response.data;
+};
+
 // End an active call by conversation ID
 export const endCall = async (conversationId: string): Promise<{
   success: boolean;

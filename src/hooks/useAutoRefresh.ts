@@ -4,8 +4,8 @@ interface UseAutoRefreshOptions {
   activeSection: 'dashboard' | 'upload' | 'invoice-list' | 'users' | 'patients';
   callingInProgress: boolean;
   setCallingInProgress: (value: boolean) => void;
-  setActiveCalls: React.Dispatch<React.SetStateAction<Map<string, { timestamp: number; conversationId?: string }>>>;
-  activeCallsRef: React.MutableRefObject<Map<string, { timestamp: number; conversationId?: string }>>;
+  setActiveCalls: React.Dispatch<React.SetStateAction<Map<string, { timestamp: number; conversationId?: string; callSid?: string; twilioStatus?: string }>>>;
+  activeCallsRef: React.MutableRefObject<Map<string, { timestamp: number; conversationId?: string; callSid?: string; twilioStatus?: string }>>;
   loadPatientData: (uploadId: number | null, silent: boolean) => Promise<void>;
   getSelectedUploadId: () => number | null;
 }

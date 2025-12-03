@@ -104,6 +104,19 @@ export const PatientDetails = ({
   const formatDate = (dateStr: string | undefined): string => {
     if (!dateStr) return '-';
     try {
+      // For date-only fields (like DOB), parse components directly to avoid timezone conversion
+      const dateParts = dateStr.split('T')[0].split('-'); // Get YYYY-MM-DD part
+      if (dateParts.length === 3) {
+        const [year, month, day] = dateParts.map(p => parseInt(p, 10));
+        // Create date using local timezone components (no conversion)
+        const date = new Date(year, month - 1, day); // month is 0-indexed
+        return date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      }
+      // Fallback for other formats
       return new Date(dateStr).toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',

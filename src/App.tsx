@@ -700,6 +700,7 @@ function App() {
           patientLastName={selectedPatient?.patient_last_name || ''}
           phoneNumber={selectedPatient?.phone_number || ''}
           invoiceNumber={selectedPatient?.invoice_number || ''}
+          patientDob={selectedPatient?.patient_dob || ''}
           onClose={() => setShowCallHistoryModal(false)}
         />
 

@@ -353,7 +353,13 @@ export const endCall = async (conversationId: string): Promise<{
 };
 
 // Get call history for a patient
-export const getCallHistory = async (phoneNumber: string, invoiceNumber?: string): Promise<{
+export const getCallHistory = async (
+  phoneNumber: string, 
+  invoiceNumber?: string,
+  patientFirstName?: string,
+  patientLastName?: string,
+  patientDob?: string
+): Promise<{
   success: boolean;
   patient_first_name: string;
   patient_last_name: string;
@@ -371,10 +377,27 @@ export const getCallHistory = async (phoneNumber: string, invoiceNumber?: string
   }>;
   total_calls: number;
 }> => {
-  const params: { phone_number: string; invoice_number?: string } = { phone_number: phoneNumber };
+  const params: { 
+    phone_number: string; 
+    invoice_number?: string;
+    patient_first_name?: string;
+    patient_last_name?: string;
+    patient_dob?: string;
+  } = { phone_number: phoneNumber };
+  
   if (invoiceNumber) {
     params.invoice_number = invoiceNumber;
   }
+  if (patientFirstName) {
+    params.patient_first_name = patientFirstName;
+  }
+  if (patientLastName) {
+    params.patient_last_name = patientLastName;
+  }
+  if (patientDob) {
+    params.patient_dob = patientDob;
+  }
+  
   const response = await api.get('/call-history', { params });
   return response.data;
 };

@@ -9,6 +9,7 @@ interface CallHistoryModalProps {
   patientLastName: string;
   phoneNumber: string;
   invoiceNumber: string;
+  patientDob?: string;
   onClose: () => void;
 }
 
@@ -30,7 +31,7 @@ const getFullName = (firstName: string, lastName: string): string => {
   return `${first} ${last}`.trim() || 'Unknown';
 };
 
-export const CallHistoryModal = ({ isOpen, patientFirstName, patientLastName, phoneNumber, invoiceNumber, onClose }: CallHistoryModalProps) => {
+export const CallHistoryModal = ({ isOpen, patientFirstName, patientLastName, phoneNumber, invoiceNumber, patientDob, onClose }: CallHistoryModalProps) => {
   const patientName = getFullName(patientFirstName, patientLastName);
   const [calls, setCalls] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,7 +45,7 @@ export const CallHistoryModal = ({ isOpen, patientFirstName, patientLastName, ph
     setLoading(true);
     setError(null);
     try {
-      const data = await getCallHistory(phoneNumber, invoiceNumber);
+      const data = await getCallHistory(phoneNumber, invoiceNumber, patientFirstName, patientLastName, patientDob);
       // Filter calls on frontend to ensure we only show calls for this specific phone + invoice combination
       // This prevents showing calls for other patients with same phone number or name
       const filteredCalls = (data.calls || []).filter(call => {

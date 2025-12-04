@@ -530,28 +530,38 @@ function App() {
       const response = await endCall(activeCall.conversationId);
       
       if (response.success) {
-        console.log('✅ Manual disconnect - removing call from activeCalls and stopping polling');
-        
-        // Clear the polling interval for this call
-        const existingInterval = pollingIntervalsRef.current.get(callKey);
-        if (existingInterval) {
-          console.log('🛑 Clearing polling interval for disconnected call');
-          clearInterval(existingInterval);
-          pollingIntervalsRef.current.delete(callKey);
-        }
-        
-        // Remove from activeCalls immediately
-        setActiveCalls(prev => {
-          const newMap = new Map(prev);
-          newMap.delete(callKey);
-          activeCallsRef.current = newMap; // Update ref immediately
-          return newMap;
-        });
+        console.log('✅ Manual disconnect - will poll for 5 more seconds to catch post-call webhook');
         
         showMessage('success', `Call ended with ${fullName}`);
         showToast('success', `Call disconnected successfully`);
         
-        // Refresh patient data to update call status
+        // Keep polling for 5 more seconds to catch the post-call webhook with summary
+        setTimeout(() => {
+          console.log('🛑 5 seconds elapsed - stopping polling for disconnected call');
+          
+          // Clear the polling interval for this call
+          const existingInterval = pollingIntervalsRef.current.get(callKey);
+          if (existingInterval) {
+            clearInterval(existingInterval);
+            pollingIntervalsRef.current.delete(callKey);
+          }
+          
+          // Remove from activeCalls
+          setActiveCalls(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(callKey);
+            activeCallsRef.current = newMap;
+            return newMap;
+          });
+          
+          // Final refresh to get updated notes from webhook
+          if (activeSection === 'upload') {
+            const currentUploadId = getSelectedUploadId();
+            loadPatientData(currentUploadId, true);
+          }
+        }, 5000); // Wait 5 seconds
+        
+        // Immediate refresh to update call status
         if (activeSection === 'upload') {
           const currentUploadId = getSelectedUploadId();
           await loadPatientData(currentUploadId, true);

@@ -465,25 +465,100 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                   )}
                 </td>
                 <td className="px-2 py-3 text-sm text-center">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (onViewCallHistory) {
-                        onViewCallHistory(patient);
-                      }
-                    }}
-                    className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
-                    title={`Click to view call history for ${getFullName(patient)} - Invoice ${patient.invoice_number}`}
-                  >
-                    {patient.call_count || 0}
-                  </button>
+                  <div className="group relative inline-block">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (onViewCallHistory) {
+                          onViewCallHistory(patient);
+                        }
+                      }}
+                      className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
+                    >
+                      {patient.call_count || 0}
+                    </button>
+                    
+                    {/* Hover Tooltip showing last 4 call attempts */}
+                    {(patient.call_count ?? 0) > 0 && patient.recent_call_notes && (
+                      <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 absolute z-50 left-1/2 transform -translate-x-1/2 bottom-full mb-2 w-72 bg-white border-2 border-teal-500 text-gray-900 text-xs rounded-lg shadow-2xl p-4 pointer-events-auto cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onViewCallHistory) {
+                            onViewCallHistory(patient);
+                          }
+                        }}
+                      >
+                        <div className="font-bold text-teal-600 mb-3 text-sm border-b border-teal-200 pb-2">CALL ATTEMPTS</div>
+                        <div className="space-y-3 max-h-64 overflow-y-auto">
+                          {(() => {
+                            const notesText = patient.recent_call_notes;
+                            // Show only last 4 attempts (most recent)
+                            if (notesText.startsWith('Attempt ')) {
+                              const lines = notesText.split('\n');
+                              const attemptLabel = lines[0];
+                              const noteContent = lines.slice(1).join('\n').trim();
+                              
+                              return (
+                                <div className="border-l-4 border-teal-500 pl-3 py-1">
+                                  <div className="font-bold text-teal-700 text-sm">{attemptLabel}</div>
+                                  {noteContent && (
+                                    <div className="text-gray-700 mt-1 text-xs leading-relaxed">
+                                      {noteContent}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="text-gray-700 text-xs">
+                                {notesText}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        {/* Arrow to show more */}
+                        <div className="mt-3 pt-3 border-t border-teal-200 flex items-center justify-center text-teal-600 font-semibold hover:text-teal-700">
+                          <span className="text-xs">Click to view all attempts</span>
+                          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                        {/* Tooltip arrow */}
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                          <div className="border-8 border-transparent border-t-white" style={{filter: 'drop-shadow(0 2px 1px rgba(0,0,0,0.1))'}}></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-2 py-3 text-sm w-[130px]">
                   {patient.recent_call_notes && patient.recent_call_notes.trim() ? (
                     <div className="group relative">
                       {(() => {
-                        const parsedNotes = parseNotes(patient.recent_call_notes);
+                        // Check if notes start with "Attempt X" (backend format)
+                        const notesText = patient.recent_call_notes;
+                        if (notesText.startsWith('Attempt ')) {
+                          const lines = notesText.split('\n');
+                          const attemptLabel = lines[0];
+                          const noteContent = lines.slice(1).join('\n').trim();
+                          
+                          return (
+                            <div className="space-y-0.5">
+                              <span className="text-xs text-gray-900 font-bold block">
+                                {attemptLabel}
+                              </span>
+                              {noteContent && (
+                                <p className="text-xs text-gray-700 leading-tight break-words">
+                                  {noteContent}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        }
+                        
+                        // Old format: Try parsing with timestamps
+                        const parsedNotes = parseNotes(notesText);
                         const latestNote = parsedNotes.length > 0 ? parsedNotes[parsedNotes.length - 1] : null;
                         
                         if (latestNote && latestNote.timestamp) {
@@ -509,7 +584,7 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                         // Fallback to raw display if parsing fails
                         return (
                       <p className="text-xs text-gray-700 leading-tight whitespace-pre-wrap break-words">
-                        {patient.recent_call_notes}
+                        {notesText}
                       </p>
                         );
                       })()}
@@ -732,25 +807,100 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                   )}
                 </td>
                 <td className="px-2 py-3 text-sm text-center">
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (onViewCallHistory) {
-                        onViewCallHistory(patient);
-                      }
-                    }}
-                    className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
-                    title={`Click to view call history for ${getFullName(patient)} - Invoice ${patient.invoice_number || 'N/A'}`}
-                  >
-                    {patient.call_count || 0}
-                  </button>
+                  <div className="group relative inline-block">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (onViewCallHistory) {
+                          onViewCallHistory(patient);
+                        }
+                      }}
+                      className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-semibold hover:bg-gray-200 transition-colors cursor-pointer"
+                    >
+                      {patient.call_count || 0}
+                    </button>
+                    
+                    {/* Hover Tooltip showing last 4 call attempts */}
+                    {(patient.call_count ?? 0) > 0 && patient.recent_call_notes && (
+                      <div className="invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 absolute z-50 left-1/2 transform -translate-x-1/2 bottom-full mb-2 w-72 bg-white border-2 border-teal-500 text-gray-900 text-xs rounded-lg shadow-2xl p-4 pointer-events-auto cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onViewCallHistory) {
+                            onViewCallHistory(patient);
+                          }
+                        }}
+                      >
+                        <div className="font-bold text-teal-600 mb-3 text-sm border-b border-teal-200 pb-2">CALL ATTEMPTS</div>
+                        <div className="space-y-3 max-h-64 overflow-y-auto">
+                          {(() => {
+                            const notesText = patient.recent_call_notes;
+                            // Show only last 4 attempts (most recent)
+                            if (notesText.startsWith('Attempt ')) {
+                              const lines = notesText.split('\n');
+                              const attemptLabel = lines[0];
+                              const noteContent = lines.slice(1).join('\n').trim();
+                              
+                              return (
+                                <div className="border-l-4 border-teal-500 pl-3 py-1">
+                                  <div className="font-bold text-teal-700 text-sm">{attemptLabel}</div>
+                                  {noteContent && (
+                                    <div className="text-gray-700 mt-1 text-xs leading-relaxed">
+                                      {noteContent}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return (
+                              <div className="text-gray-700 text-xs">
+                                {notesText}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        {/* Arrow to show more */}
+                        <div className="mt-3 pt-3 border-t border-teal-200 flex items-center justify-center text-teal-600 font-semibold hover:text-teal-700">
+                          <span className="text-xs">Click to view all attempts</span>
+                          <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </div>
+                        {/* Tooltip arrow */}
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                          <div className="border-8 border-transparent border-t-white" style={{filter: 'drop-shadow(0 2px 1px rgba(0,0,0,0.1))'}}></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </td>
                 <td className="px-2 py-3 text-sm w-[130px]">
                   {patient.recent_call_notes && patient.recent_call_notes.trim() ? (
                     <div className="group relative">
                       {(() => {
-                        const parsedNotes = parseNotes(patient.recent_call_notes);
+                        // Check if notes start with "Attempt X" (backend format)
+                        const notesText = patient.recent_call_notes;
+                        if (notesText.startsWith('Attempt ')) {
+                          const lines = notesText.split('\n');
+                          const attemptLabel = lines[0];
+                          const noteContent = lines.slice(1).join('\n').trim();
+                          
+                          return (
+                            <div className="space-y-0.5">
+                              <span className="text-[10px] text-gray-900 font-bold block">
+                                {attemptLabel}
+                              </span>
+                              {noteContent && (
+                                <p className="text-[10px] text-gray-700 leading-tight break-words">
+                                  {noteContent}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        }
+                        
+                        // Old format: Try parsing with timestamps
+                        const parsedNotes = parseNotes(notesText);
                         const latestNote = parsedNotes.length > 0 ? parsedNotes[parsedNotes.length - 1] : null;
                         
                         if (latestNote && latestNote.timestamp) {
@@ -776,7 +926,7 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                         // Fallback to raw display if parsing fails
                         return (
                       <p className="text-[10px] text-gray-700 leading-tight whitespace-pre-wrap break-words">
-                        {patient.recent_call_notes}
+                        {notesText}
                       </p>
                         );
                       })()}

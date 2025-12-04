@@ -124,15 +124,25 @@ export const CallHistoryModal = ({ isOpen, patientFirstName, patientLastName, ph
             </div>
           ) : (
             <div className="space-y-4">
-              {calls.map((call) => {
-                const callPatientName = getFullName(call.patient_first_name || '', call.patient_last_name || '');
+              {calls.map((call, index) => {
+                // Parse "Attempt X" from notes if it exists (backend adds it)
+                let attemptLabel = `Attempt ${index + 1}`;
+                let noteContent = call.notes || '';
+                
+                if (call.notes && call.notes.startsWith('Attempt ')) {
+                  const lines = call.notes.split('\n');
+                  if (lines.length > 0 && lines[0].startsWith('Attempt ')) {
+                    attemptLabel = lines[0];
+                    noteContent = lines.slice(1).join('\n').trim();
+                  }
+                }
+                
                 return (
                   <div key={call.id} className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <FiClock className="text-gray-400" size={16} />
-                          <span className="text-xs text-gray-500">{formatDateTime(call.called_at)}</span>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm font-bold text-gray-900">{attemptLabel}</span>
                           <span className={`px-2 py-0.5 rounded text-xs font-medium ${
                             call.call_status === 'completed' 
                               ? 'bg-green-100 text-green-800' 
@@ -143,21 +153,16 @@ export const CallHistoryModal = ({ isOpen, patientFirstName, patientLastName, ph
                             {call.call_status}
                           </span>
                         </div>
-                        <div className="text-xs text-gray-600 ml-6">
-                          <span className="font-medium">Patient:</span> {callPatientName}
-                          {call.invoice_number && (
-                            <> | <span className="font-medium">Invoice:</span> {call.invoice_number}</>
-                          )}
-                          {call.phone_number && (
-                            <> | <span className="font-medium">Phone:</span> {call.phone_number}</>
-                          )}
+                        <div className="flex items-center gap-2 mb-1">
+                          <FiClock className="text-gray-400" size={14} />
+                          <span className="text-xs text-gray-500">{formatDateTime(call.called_at)}</span>
                         </div>
                       </div>
                     </div>
-                    {call.notes && (
+                    {noteContent && (
                       <div className="mt-2">
                         <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap bg-white rounded-lg p-3 border border-gray-200">
-                          {call.notes}
+                          {noteContent}
                         </p>
                       </div>
                     )}

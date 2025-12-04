@@ -10,7 +10,7 @@ interface FileOption {
 }
 
 interface UseFileUploadOptions {
-  onUploadSuccess?: (filename: string) => void;
+  onUploadSuccess?: (filename: string, uploadId?: number) => void;
   onError?: (error: string) => void;
   showMessage?: (type: 'success' | 'error' | 'info', text: string) => void;
 }
@@ -97,12 +97,14 @@ export const useFileUpload = (options: UseFileUploadOptions = {}) => {
       }
       
       const uploadedFilename = response.filename || '';
-      options.onUploadSuccess?.(uploadedFilename);
+      const uploadId = response.upload_id;  // Get upload_id from response
+      options.onUploadSuccess?.(uploadedFilename, uploadId);
       
       await loadAvailableFiles();
       
       return {
         filename: uploadedFilename,
+        uploadId: uploadId,  // Return upload_id
         availableFiles: availableFiles,
       };
     } catch (error) {

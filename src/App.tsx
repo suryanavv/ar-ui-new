@@ -67,30 +67,17 @@ function App() {
     loadAvailableFiles,
   } = useFileUpload({
     showMessage: (type, text) => showMessage(type, text),
-    onUploadSuccess: async (filename) => {
+    onUploadSuccess: async (filename, uploadId) => {
       setCurrentFile(filename || 'database');
       setSelectedFile(filename);
       localStorage.setItem('currentFile', filename || 'database');
       await loadAvailableFiles();
       
-      if (filename) {
-        const recentUpload = availableFiles
-          .filter(f => f.filename === filename)
-          .sort((a, b) => {
-            const dateA = a.uploaded_at ? new Date(a.uploaded_at).getTime() : 0;
-            const dateB = b.uploaded_at ? new Date(b.uploaded_at).getTime() : 0;
-            return dateB - dateA;
-          })[0];
-        
-        if (recentUpload) {
-          setSelectedUploadId(recentUpload.id);
-          setSelectedUploadIdRef(recentUpload.id);
-          await loadPatientData(recentUpload.id, false);
-        } else {
-          setSelectedUploadId(null);
-          setSelectedUploadIdRef(null);
-          await loadPatientData(null, false);
-        }
+      // Use the upload_id directly from the API response instead of searching for it
+      if (uploadId) {
+        setSelectedUploadId(uploadId);
+        setSelectedUploadIdRef(uploadId);
+        await loadPatientData(uploadId, false);
       } else {
         setSelectedUploadId(null);
         setSelectedUploadIdRef(null);

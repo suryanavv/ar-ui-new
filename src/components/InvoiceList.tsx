@@ -8,6 +8,7 @@ import { NotesModal } from './NotesModal';
 import { PatientDetails } from './PatientDetails';
 import { ConfirmModal } from './ConfirmModal';
 import { MessageAlert } from './MessageAlert';
+import { BsFiletypePdf, BsFiletypeCsv, BsFileEarmarkExcel } from 'react-icons/bs';
 
 interface FileUpload {
   id: number;
@@ -28,6 +29,22 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
   const [loading, setLoading] = useState(true);
   const [selectedUploadId, setSelectedUploadId] = useState<number | null>(null);
   const [patients, setPatients] = useState<Patient[]>([]);
+  
+  const getFileIcon = (filename: string) => {
+    const name = filename.toLowerCase();
+    if (name.endsWith('.pdf')) {
+      return <BsFiletypePdf className="w-5 h-5 text-red-600" />;
+    } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+      return <BsFileEarmarkExcel className="w-5 h-5 text-green-600" />;
+    } else if (name.endsWith('.csv')) {
+      return <BsFiletypeCsv className="w-5 h-5 text-blue-600" />;
+    }
+    return (
+      <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    );
+  };
   const [loadingPatients, setLoadingPatients] = useState(false);
   const [showCallHistoryModal, setShowCallHistoryModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
@@ -500,7 +517,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
         <MessageAlert message={message} />
       )}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Uploaded CSV Files</h2>
+        <h2 className="text-xl font-semibold text-gray-900">Uploaded Files</h2>
         <button
           onClick={loadUploads}
           className="px-4 py-2 text-sm font-medium text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors"
@@ -517,7 +534,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
             </svg>
           </div>
           <p className="text-gray-500 text-lg font-medium mb-2">No files uploaded yet</p>
-          <p className="text-gray-400 text-sm">Upload a CSV file to get started</p>
+          <p className="text-gray-400 text-sm">Upload a file (CSV, Excel, or PDF) to get started</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -530,9 +547,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-teal-100 rounded-lg">
-                    <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+                    {getFileIcon(upload.filename)}
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-900">{upload.filename}</p>

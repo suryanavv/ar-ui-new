@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { FiUpload, FiFile, FiX } from 'react-icons/fi';
+import { BsFiletypePdf, BsFiletypeCsv, BsFileEarmarkExcel } from 'react-icons/bs';
 
 interface FileUploadProps {
   onUpload: (file: File) => void;
@@ -12,14 +13,26 @@ export const FileUpload = ({ onUpload, loading }: FileUploadProps) => {
   const [isDragging, setIsDragging] = useState(false);
 
   const validateFile = (file: File): boolean => {
-    const validExtensions = ['.csv', '.xlsx', '.xls'];
+    const validExtensions = ['.csv', '.xlsx', '.xls', '.pdf'];
     const isValid = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
     
     if (!isValid) {
-      alert('Please select a CSV, XLSX, or XLS file');
+      alert('Please select a CSV, XLSX, XLS, or PDF file');
       return false;
     }
     return true;
+  };
+
+  const getFileIcon = (filename: string) => {
+    const name = filename.toLowerCase();
+    if (name.endsWith('.pdf')) {
+      return <BsFiletypePdf className="text-red-600 flex-shrink-0" size={20} />;
+    } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+      return <BsFileEarmarkExcel className="text-green-600 flex-shrink-0" size={20} />;
+    } else if (name.endsWith('.csv')) {
+      return <BsFiletypeCsv className="text-blue-600 flex-shrink-0" size={20} />;
+    }
+    return <FiFile className="text-teal-700 flex-shrink-0" size={20} />;
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,7 +129,7 @@ export const FileUpload = ({ onUpload, loading }: FileUploadProps) => {
               <div className="w-full max-w-md space-y-3">
                 <div className="flex items-center justify-between px-4 py-3 bg-white rounded-lg border-2 border-teal-700 shadow-sm">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <FiFile className="text-teal-700 flex-shrink-0" size={20} />
+                    {getFileIcon(selectedFile.name)}
                     <span className="text-sm font-medium text-gray-900 truncate">
                       {selectedFile.name}
                     </span>
@@ -149,7 +162,7 @@ export const FileUpload = ({ onUpload, loading }: FileUploadProps) => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.xlsx,.xls"
+                  accept=".csv,.xlsx,.xls,.pdf"
                   onChange={handleFileChange}
                   disabled={loading}
                   className="hidden"
@@ -163,6 +176,7 @@ export const FileUpload = ({ onUpload, loading }: FileUploadProps) => {
                 <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded">CSV</span>
                 <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded">XLSX</span>
                 <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded">XLS</span>
+                <span className="px-2 py-1 bg-teal-100 text-teal-700 text-xs font-medium rounded">PDF</span>
               </div>
             </div>
           </div>

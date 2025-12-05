@@ -154,7 +154,7 @@ export const Dashboard = () => {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No Data Available</h3>
           <p className="text-gray-500 mb-4">
-            Upload a CSV file to start tracking invoices and see analytics here.
+            Upload a file (CSV, Excel, or PDF) to start tracking invoices and see analytics here.
           </p>
           <p className="text-sm text-gray-400">
             Make sure your database is properly configured and tables are created.

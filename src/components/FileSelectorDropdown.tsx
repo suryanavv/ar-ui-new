@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { FiChevronDown, FiCheck, FiSearch, FiX, FiCalendar } from 'react-icons/fi';
+import { BsFiletypePdf, BsFiletypeCsv, BsFileEarmarkExcel } from 'react-icons/bs';
 import { utcToLocalDate, getLocalDateKey, formatDateKey } from '../utils/timezone';
 
 interface FileOption {
@@ -31,6 +32,18 @@ export const FileSelectorDropdown = ({
   const [endDate, setEndDate] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const getFileIcon = (filename: string) => {
+    const name = filename.toLowerCase();
+    if (name.endsWith('.pdf')) {
+      return <BsFiletypePdf className="flex-shrink-0 text-red-600" size={16} />;
+    } else if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+      return <BsFileEarmarkExcel className="flex-shrink-0 text-green-600" size={16} />;
+    } else if (name.endsWith('.csv')) {
+      return <BsFiletypeCsv className="flex-shrink-0 text-blue-600" size={16} />;
+    }
+    return null;
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -320,18 +333,21 @@ export const FileSelectorDropdown = ({
                         }
                       `}
                     >
-                      <div className="flex-1 min-w-0 pr-2">
-                        <div className="truncate text-xs font-medium">{option.displayName}</div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          {option.patient_count} patient{option.patient_count !== 1 ? 's' : ''}
-                          {option.uploaded_at && (() => {
-                            const localDate = utcToLocalDate(option.uploaded_at);
-                            return localDate ? (
-                              <span className="ml-1.5">
-                                • {localDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              </span>
-                            ) : null;
-                          })()}
+                      <div className="flex items-center gap-2 flex-1 min-w-0 pr-2">
+                        {getFileIcon(option.filename)}
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate text-xs font-medium">{option.displayName}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            {option.patient_count} patient{option.patient_count !== 1 ? 's' : ''}
+                            {option.uploaded_at && (() => {
+                              const localDate = utcToLocalDate(option.uploaded_at);
+                              return localDate ? (
+                                <span className="ml-1.5">
+                                  • {localDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </span>
+                              ) : null;
+                            })()}
+                          </div>
                         </div>
                       </div>
                       {selectedUploadId === option.id && (

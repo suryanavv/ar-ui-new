@@ -205,6 +205,14 @@ export const getAllPatients = async (sourceFilename?: string): Promise<{ success
   return response.data;
 };
 
+// Get patients by aging bucket
+export const getPatientsByAgingBucket = async (agingBucket: string): Promise<{ success: boolean; count: number; patients: Patient[] }> => {
+  const response = await api.get('/patients', {
+    params: { aging_bucket: agingBucket }
+  });
+  return response.data;
+};
+
 // File upload item interface
 export interface FileUploadItem {
   id: number;

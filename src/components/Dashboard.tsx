@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
-import { getDashboardStats } from '../services/api';
+import { useEffect, useState, useRef } from 'react';
+import { getDashboardStats, getPatientsByAgingBucket } from '../services/api';
 import { CalendarView } from './CalendarView';
 import { formatDateTime } from '../utils/timezone';
+import { FiChevronDown, FiCheck, FiX } from 'react-icons/fi';
+import type { Patient } from '../types';
 
 interface DashboardStats {
   total_invoices: number;
@@ -43,6 +45,12 @@ export const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPaidPatientsModal, setShowPaidPatientsModal] = useState(false);
+  const [selectedAgingBucket, setSelectedAgingBucket] = useState<string | null>(null);
+  const [isAgingDropdownOpen, setIsAgingDropdownOpen] = useState(false);
+  const agingDropdownRef = useRef<HTMLDivElement>(null);
+  const [showAgingBucketModal, setShowAgingBucketModal] = useState(false);
+  const [agingBucketPatients, setAgingBucketPatients] = useState<Patient[]>([]);
+  const [loadingAgingPatients, setLoadingAgingPatients] = useState(false);
 
   const loadStats = async () => {
     try {
@@ -61,6 +69,22 @@ export const Dashboard = () => {
   useEffect(() => {
     loadStats();
   }, []);
+
+  // Handle click outside to close aging bucket dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (agingDropdownRef.current && !agingDropdownRef.current.contains(event.target as Node)) {
+        setIsAgingDropdownOpen(false);
+      }
+    };
+
+    if (isAgingDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isAgingDropdownOpen]);
 
 
   // Expose refresh function so parent can trigger manual refresh
@@ -107,7 +131,7 @@ export const Dashboard = () => {
 
   // Normalize aging buckets by grouping case-insensitively and handling dash variations
   const normalizeAgingBuckets = (buckets: Array<{ bucket: string; count: number; total_amount: number }>) => {
-    const normalizedMap = new Map<string, { bucket: string; count: number; total_amount: number }>();
+    const normalizedMap = new Map<string, { bucket: string; count: number; total_amount: number; originalBucket?: string }>();
     
     buckets.forEach(item => {
       // Normalize: lowercase, replace en-dash/em-dash with hyphen, trim
@@ -134,12 +158,38 @@ export const Dashboard = () => {
         normalizedMap.set(normalizedKey, {
           bucket: displayName,
           count: item.count,
-          total_amount: item.total_amount
+          total_amount: item.total_amount,
+          originalBucket: item.bucket // Keep original for API calls
         });
       }
     });
     
     return Array.from(normalizedMap.values());
+  };
+
+  // Sort aging buckets by numeric order (extract numbers from bucket names)
+  const sortAgingBuckets = (buckets: Array<{ bucket: string; count: number; total_amount: number }>) => {
+    const sorted = [...buckets];
+    
+    sorted.sort((a, b) => {
+      // Extract first number from bucket name (e.g., "0-30 Days" -> 0, "31-60 Days" -> 31)
+      const extractFirstNumber = (bucket: string): number => {
+        const match = bucket.match(/(\d+)/);
+        return match ? parseInt(match[1], 10) : 9999; // Put non-numeric buckets at the end
+      };
+      
+      const numA = extractFirstNumber(a.bucket);
+      const numB = extractFirstNumber(b.bucket);
+      
+      if (numA !== numB) {
+        return numA - numB;
+      }
+      
+      // If same starting number, sort alphabetically
+      return a.bucket.localeCompare(b.bucket);
+    });
+    
+    return sorted;
   };
 
   // Show empty state if no data
@@ -299,21 +349,126 @@ export const Dashboard = () => {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Outstanding by Aging Bucket</h3>
           </div>
-          <div className="space-y-3">
-            {stats.aging_distribution.length > 0 ? (
-              normalizeAgingBuckets(stats.aging_distribution).map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">{item.bucket}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-gray-500">{item.count} invoices</span>
-                    <span className="text-sm font-semibold text-gray-900">{formatCurrency(item.total_amount)}</span>
+          
+          {stats.aging_distribution.length > 0 ? (
+            <>
+              {/* Dropdown Selector */}
+              <div className="relative mb-4" ref={agingDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsAgingDropdownOpen(!isAgingDropdownOpen)}
+                  className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
+                >
+                  <span>
+                    {selectedAgingBucket 
+                      ? sortAgingBuckets(normalizeAgingBuckets(stats.aging_distribution)).find(b => b.bucket === selectedAgingBucket)?.bucket || 'Select aging bucket'
+                      : 'All Aging Buckets'}
+                  </span>
+                  <FiChevronDown 
+                    className={`ml-2 h-5 w-5 text-gray-500 flex-shrink-0 transition-transform duration-200 ${
+                      isAgingDropdownOpen ? 'transform rotate-180' : ''
+                    }`}
+                  />
+                </button>
+
+                {isAgingDropdownOpen && (
+                  <div className="absolute z-50 mt-2 w-full bg-white rounded-lg shadow-xl border border-gray-200 py-2 max-h-64 overflow-y-auto">
+                    {/* All option */}
+                    <button
+                      onClick={() => {
+                        setSelectedAgingBucket(null);
+                        setIsAgingDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
+                        selectedAgingBucket === null
+                          ? 'bg-teal-50 text-teal-700 font-semibold'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span>All Aging Buckets</span>
+                      {selectedAgingBucket === null && (
+                        <FiCheck className="h-5 w-5 text-teal-600" />
+                      )}
+                    </button>
+                    
+                    {/* Individual bucket options */}
+                    {sortAgingBuckets(normalizeAgingBuckets(stats.aging_distribution)).map((item, index) => {
+                      // Use the bucket name as-is for API call (backend will normalize it)
+                      const bucketForApi = item.bucket;
+                      
+                      return (
+                        <button
+                          key={index}
+                          onClick={async () => {
+                            setSelectedAgingBucket(item.bucket);
+                            setIsAgingDropdownOpen(false);
+                            // Fetch and show invoices for this bucket
+                            setLoadingAgingPatients(true);
+                            setShowAgingBucketModal(true);
+                            try {
+                              console.log('Fetching patients for aging bucket:', bucketForApi);
+                              const result = await getPatientsByAgingBucket(bucketForApi);
+                              console.log('Received patients:', result);
+                              setAgingBucketPatients(result.patients || []);
+                            } catch (error) {
+                              console.error('Failed to load patients by aging bucket:', error);
+                              setAgingBucketPatients([]);
+                            } finally {
+                              setLoadingAgingPatients(false);
+                            }
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
+                            selectedAgingBucket === item.bucket
+                              ? 'bg-teal-50 text-teal-700 font-semibold'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span>{item.bucket} ({item.count} invoices - {formatCurrency(item.total_amount)})</span>
+                          {selectedAgingBucket === item.bucket && (
+                            <FiCheck className="h-5 w-5 text-teal-600" />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-gray-500 text-center py-4">No data available</p>
-            )}
-          </div>
+                )}
+              </div>
+
+              {/* Display selected bucket or all buckets */}
+              <div className="space-y-3">
+                {selectedAgingBucket ? (
+                  // Show only selected bucket
+                  (() => {
+                    const selectedItem = sortAgingBuckets(normalizeAgingBuckets(stats.aging_distribution)).find(
+                      item => item.bucket === selectedAgingBucket
+                    );
+                    return selectedItem ? (
+                      <div className="flex items-center justify-between p-4 bg-teal-50 rounded-lg border border-teal-200">
+                        <span className="text-sm font-semibold text-gray-900">{selectedItem.bucket}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-gray-600">{selectedItem.count} invoices</span>
+                          <span className="text-lg font-bold text-teal-700">{formatCurrency(selectedItem.total_amount)}</span>
+                        </div>
+                      </div>
+                    ) : null;
+                  })()
+                ) : (
+                  // Show all buckets (sorted)
+                  sortAgingBuckets(normalizeAgingBuckets(stats.aging_distribution)).map((item, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700">{item.bucket}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm text-gray-500">{item.count} invoices</span>
+                        <span className="text-sm font-semibold text-gray-900">{formatCurrency(item.total_amount)}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-500 text-center py-4">No data available</p>
+          )}
         </div>
       </div>
 
@@ -427,6 +582,105 @@ export const Dashboard = () => {
                 </div>
                 <p className="text-sm text-gray-600">
                   Total Amount: <span className="font-semibold text-emerald-700">{formatCurrency(stats.total_amount_paid || 0)}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Aging Bucket Invoices Modal */}
+      {showAgingBucketModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowAgingBucketModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Invoices - {selectedAgingBucket || 'Aging Bucket'}
+              </h2>
+              <button
+                onClick={() => setShowAgingBucketModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <FiX className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="px-6 py-4 overflow-y-auto flex-1">
+              {loadingAgingPatients ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+                </div>
+              ) : agingBucketPatients.length > 0 ? (
+                <div className="space-y-3">
+                  {[...agingBucketPatients]
+                    .sort((a, b) => {
+                      const amountA = parseFloat(a.outstanding_amount || '0');
+                      const amountB = parseFloat(b.outstanding_amount || '0');
+                      return amountB - amountA; // Sort highest to lowest
+                    })
+                    .map((patient, index) => {
+                    // Helper function to clean MISSING values and format display
+                    const cleanValue = (value: string | undefined): string => {
+                      if (!value) return '';
+                      const val = String(value);
+                      if (val.startsWith('MISSING_') || val.toLowerCase() === 'nan') return '';
+                      return val;
+                    };
+                    
+                    const firstName = cleanValue(patient.patient_first_name);
+                    const lastName = cleanValue(patient.patient_last_name);
+                    const fullName = `${firstName} ${lastName}`.trim() || 'Unknown Patient';
+                    const invoiceNum = cleanValue(patient.invoice_number) || 'N/A';
+                    const phoneNum = cleanValue(patient.phone_number);
+                    const dob = cleanValue(patient.patient_dob);
+                    
+                    return (
+                      <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 truncate">
+                            {fullName}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1">Invoice: {invoiceNum}</p>
+                          {dob && (
+                            <p className="text-xs text-gray-600 mt-1">DOB: {dob}</p>
+                          )}
+                          {phoneNum && (
+                            <p className="text-xs text-gray-600 mt-1">Phone: {phoneNum}</p>
+                          )}
+                          {patient.invoice_date && (
+                            <p className="text-xs text-gray-500 mt-1">Date: {patient.invoice_date}</p>
+                          )}
+                        </div>
+                        <div className="text-right ml-4">
+                          <p className="text-lg font-bold text-red-600">{formatCurrency(parseFloat(patient.outstanding_amount || '0'))}</p>
+                          <p className="text-xs text-gray-500 mt-1">Outstanding</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-gray-100 mb-4">
+                    <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <p className="text-gray-500 text-lg font-medium mb-2">No invoices found</p>
+                  <p className="text-gray-400 text-sm">No invoices found for this aging bucket</p>
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-600">
+                  Total Invoices: <span className="font-semibold text-gray-900">{agingBucketPatients.length}</span>
+                </p>
+                <p className="text-sm text-gray-600">
+                  Total Outstanding: <span className="font-semibold text-red-700">
+                    {formatCurrency(
+                      agingBucketPatients.reduce((sum, p) => sum + parseFloat(p.outstanding_amount || '0'), 0)
+                    )}
+                  </span>
                 </p>
               </div>
             </div>

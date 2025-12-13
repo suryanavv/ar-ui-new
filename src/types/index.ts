@@ -5,6 +5,8 @@ export interface User {
   role?: string; // 'admin' or 'user'
   clinic?: string; // Clinic name
   ims_user_id?: string; // IMS user ID for SSO users
+  payment_provider?: string; // Payment provider from SSO token
+  payment_provider_guid?: string; // Payment provider GUID from SSO token
 }
 
 export interface Patient {

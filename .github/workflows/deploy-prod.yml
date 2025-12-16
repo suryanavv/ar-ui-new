@@ -1,0 +1,57 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy to Production Frontend EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PROD_FRONTEND_HOST }}
+          username: ${{ secrets.PROD_FRONTEND_USER }}
+          key: ${{ secrets.PROD_FRONTEND_SSH_KEY }}
+          script: |
+            set -e
+            
+            echo "🔄 Starting PRODUCTION frontend deployment..."
+            cd /home/ubuntu/ar-ui/current
+            
+            echo "📦 Pulling latest code..."
+            git fetch origin
+            git reset --hard origin/main
+            
+            echo "🔑 Copying environment file..."
+            cp /home/ubuntu/ar-ui/.env .env
+            
+            echo "📚 Installing dependencies..."
+            rm -f package-lock.json
+            npm install --legacy-peer-deps
+            
+            echo "🏗️  Building production bundle..."
+            npm run build
+            
+            echo "🔍 Verifying build..."
+            if ! grep -q "Authorization" dist/assets/*.js; then
+              echo "❌ Build verification failed: Authorization interceptor missing"
+              exit 1
+            fi
+            
+            echo "📁 Deploying to nginx..."
+            sudo rm -rf /var/www/ar-ui/html/*
+            sudo cp -r dist/* /var/www/ar-ui/html/
+            
+            echo "🔄 Reloading nginx..."
+            sudo nginx -t
+            sudo systemctl reload nginx
+            
+            echo "🏥 Health check..."
+            curl -f http://localhost/ || (echo "❌ Health check failed" && exit 1)
+            
+            echo "✅ PRODUCTION frontend deployment complete!"
+            echo "🌐 Live at: https://ar.clinqly.ai"

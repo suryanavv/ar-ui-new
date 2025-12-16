@@ -24,7 +24,7 @@ jobs:
             
             echo "📦 Pulling latest code..."
             git fetch origin
-            git reset --hard origin/main
+            git reset --hard origin/staging-dev
             
             echo "🔑 Copying environment file..."
             cp /home/ubuntu/ar-ui/.env .env

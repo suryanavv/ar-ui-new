@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: Deploy Frontend to Production
 
 on:
   push:
@@ -6,52 +6,53 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy-frontend:
+  trigger-deployment:
     runs-on: ubuntu-latest
+    environment: production
     
     steps:
-      - name: Deploy to Production Frontend EC2
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.PROD_FRONTEND_HOST }}
-          username: ${{ secrets.PROD_FRONTEND_USER }}
-          key: ${{ secrets.PROD_FRONTEND_SSH_KEY }}
-          script: |
-            set -e
-            
-            echo "🔄 Starting PRODUCTION frontend deployment..."
-            cd /home/ubuntu/ar-ui/current
-            
-            echo "📦 Pulling latest code..."
-            git fetch origin
-            git reset --hard origin/main
-            
-            echo "🔑 Copying environment file..."
-            cp /home/ubuntu/ar-ui/.env .env
-            
-            echo "📚 Installing dependencies..."
-            rm -f package-lock.json
-            npm install --legacy-peer-deps
-            
-            echo "🏗️  Building production bundle..."
-            npm run build
-            
-            echo "🔍 Verifying build..."
-            if ! grep -q "Authorization" dist/assets/*.js; then
-              echo "❌ Build verification failed: Authorization interceptor missing"
-              exit 1
-            fi
-            
-            echo "📁 Deploying to nginx..."
-            sudo rm -rf /var/www/ar-ui/html/*
-            sudo cp -r dist/* /var/www/ar-ui/html/
-            
-            echo "🔄 Reloading nginx..."
-            sudo nginx -t
-            sudo systemctl reload nginx
-            
-            echo "🏥 Health check..."
-            curl -f http://localhost/ || (echo "❌ Health check failed" && exit 1)
-            
-            echo "✅ PRODUCTION frontend deployment complete!"
-            echo "🌐 Live at: https://ar.clinqly.ai"
+      - name: Trigger Production Deployment via Webhook
+        env:
+          WEBHOOK_SECRET: ${{ secrets.GITHUB_WEBHOOK_SECRET }}
+        run: |
+          PAYLOAD=$(cat <<PAYLOAD_EOF
+          {
+            "ref": "refs/heads/main",
+            "repository": {
+              "name": "ar-ui",
+              "full_name": "ezmedtech-ai/ar-ui"
+            },
+            "pusher": {
+              "name": "github-actions"
+            },
+            "head_commit": {
+              "id": "${{ github.sha }}",
+              "message": "${{ github.event.head_commit.message }}"
+            }
+          }
+          PAYLOAD_EOF
+          )
+          
+          SIGNATURE="sha256=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | sed 's/^.* //')"
+          
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: push" \
+            -H "X-Hub-Signature-256: $SIGNATURE" \
+            -d "$PAYLOAD" \
+            https://ar.clinqly.ai/webhook)
+          
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+          
+          echo "Response Code: $HTTP_CODE"
+          echo "Response Body: $BODY"
+          
+          if [ "$HTTP_CODE" -eq 200 ]; then
+            echo "✅ Deployment webhook triggered successfully"
+            exit 0
+          else
+            echo "❌ Deployment webhook failed"
+            exit 1
+          fi

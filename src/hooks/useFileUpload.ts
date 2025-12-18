@@ -18,6 +18,7 @@ interface UseFileUploadOptions {
 export const useFileUpload = (options: UseFileUploadOptions = {}) => {
   const [uploadLoading, setUploadLoading] = useState(false);
   const [availableFiles, setAvailableFiles] = useState<Array<FileOption>>([]);
+  const [lastUploadResponse, setLastUploadResponse] = useState<any>(null);
 
   const sanitizeFileName = (fileName: string): string => {
     const lastDotIndex = fileName.lastIndexOf('.');
@@ -98,6 +99,10 @@ export const useFileUpload = (options: UseFileUploadOptions = {}) => {
       
       const uploadedFilename = response.filename || '';
       const uploadId = response.upload_id;  // Get upload_id from response
+      
+      // Store the full upload response for download
+      setLastUploadResponse(response);
+      
       options.onUploadSuccess?.(uploadedFilename, uploadId);
       
       await loadAvailableFiles();
@@ -124,6 +129,7 @@ export const useFileUpload = (options: UseFileUploadOptions = {}) => {
     availableFiles,
     handleFileUpload,
     loadAvailableFiles,
+    lastUploadResponse,
   };
 };
 

@@ -1,7 +1,8 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { FileUpload, FileSelectorDropdown, BatchCallButton, DownloadButton, PatientTable, ConfirmModal } from './';
 import type { Patient } from '../types';
-import { FiSearch, FiX, FiChevronDown, FiCheck } from 'react-icons/fi';
+import { FiSearch, FiX, FiChevronDown, FiCheck, FiDownload } from 'react-icons/fi';
+import { exportARTestingCSV, updatePatient, exportSelectedPatients } from '../services/api';
 
 interface FileOption {
   id: number;
@@ -28,6 +29,7 @@ interface UploadSectionProps {
   onEndCall: (patient: Patient) => void;
   onViewCallHistory: (patient: Patient) => void;
   onViewDetails: (patient: Patient) => void;
+  onRefreshPatients?: () => Promise<void>;
 }
 
 type CallStatusFilter = 'all' | 'pending' | 'sent' | 'completed';
@@ -49,13 +51,94 @@ export const UploadSection = ({
   onEndCall,
   onViewCallHistory,
   onViewDetails,
+  onRefreshPatients,
 }: UploadSectionProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [callStatusFilter, setCallStatusFilter] = useState<CallStatusFilter>('all');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showBatchCallModal, setShowBatchCallModal] = useState(false);
+  const [downloadingARTesting, setDownloadingARTesting] = useState(false);
+  const [downloadingSelected, setDownloadingSelected] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Export AR Testing format CSV
+  // Handle patient update
+  const handleUpdatePatient = async (invoiceId: number, updates: Record<string, string | number>) => {
+    try {
+      await updatePatient(invoiceId, updates);
+      // Refresh patient data after update
+      if (onRefreshPatients) {
+        await onRefreshPatients();
+      }
+    } catch (error) {
+      console.error('Failed to update patient:', error);
+      throw error; // Re-throw to let PatientTable handle the error display
+    }
+  };
+
+  // Handle export selected patients
+  const handleExportSelected = async () => {
+    if (filteredPatients.length === 0 || downloadingSelected) return;
+    
+    try {
+      setDownloadingSelected(true);
+      const invoiceIds = filteredPatients
+        .filter(p => p.id)
+        .map(p => p.id!);
+      
+      if (invoiceIds.length === 0) {
+        alert('No patients selected to export');
+        return;
+      }
+      
+      const blob = await exportSelectedPatients(invoiceIds);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `selected_patients_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export selected patients:', error);
+      alert('Failed to export selected patients. Please try again.');
+    } finally {
+      setDownloadingSelected(false);
+    }
+  };
+
+  const handleExportARTesting = async () => {
+    if (downloadingARTesting) return;
+    
+    try {
+      setDownloadingARTesting(true);
+      const filename = selectedUploadId 
+        ? (() => {
+            const selectedUpload = availableFiles.find(f => f.id === selectedUploadId);
+            return selectedUpload?.filename || currentFile;
+          })()
+        : currentFile;
+      
+      const blob = await exportARTestingCSV(filename, selectedUploadId || undefined);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const downloadFilename = filename.replace('.csv', '') + '_AR_Testing.csv';
+      link.setAttribute('download', downloadFilename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export AR Testing CSV:', error);
+      alert('Failed to export AR Testing CSV. Please try again.');
+    } finally {
+      setDownloadingARTesting(false);
+    }
+  };
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -203,23 +286,38 @@ export const UploadSection = ({
               </div>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <BatchCallButton 
                 onClick={onBatchCall}
                 disabled={patients.length === 0 || callingInProgress}
                 loading={callingInProgress}
               />
               
-              <DownloadButton 
-                filename={selectedUploadId 
-                  ? (() => {
-                      const selectedUpload = availableFiles.find(f => f.id === selectedUploadId);
-                      return selectedUpload?.filename || currentFile;
-                    })()
-                  : currentFile}
-                uploadId={selectedUploadId || undefined}
-                disabled={patients.length === 0}
-              />
+              {/* Export AR Testing CSV button - Only show when a specific file is selected (not All Patients) */}
+              {selectedUploadId && patients.length > 0 && (
+                <button
+                  onClick={handleExportARTesting}
+                  disabled={downloadingARTesting}
+                  className={`inline-flex items-center gap-2 px-4 py-3 border-2 border-teal-600 text-teal-700 rounded-xl font-semibold transition-all ${
+                    downloadingARTesting
+                      ? 'opacity-60 cursor-not-allowed'
+                      : 'hover:bg-teal-50 hover:shadow-lg hover:-translate-y-0.5'
+                  }`}
+                  title="Export AR Testing format CSV"
+                >
+                  {downloadingARTesting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-teal-700 border-t-transparent rounded-full animate-spin"></div>
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FiDownload size={18} />
+                      <span>Export AR Testing</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -308,6 +406,38 @@ export const UploadSection = ({
                   </div>
                 )}
               </div>
+
+              {/* Export Selected CSV Button - Show when there are filtered patients */}
+              {filteredPatients.length > 0 && (searchTerm.trim() || callStatusFilter !== 'all') && (
+                <button
+                  onClick={handleExportSelected}
+                  disabled={downloadingSelected || filteredPatients.length === 0}
+                  className={`inline-flex items-center gap-2 px-4 py-2.5 border-2 border-teal-700 text-teal-700 rounded-lg text-sm font-semibold transition-all ${
+                    downloadingSelected || filteredPatients.length === 0
+                      ? 'opacity-60 cursor-not-allowed border-gray-400 text-gray-400' 
+                      : 'hover:bg-teal-50 hover:shadow-sm'
+                  }`}
+                  title="Export filtered/selected patients as CSV"
+                >
+                  <FiDownload size={16} />
+                  <span>{downloadingSelected ? 'Exporting...' : 'Export Selected CSV'}</span>
+                </button>
+              )}
+
+              {/* Export Results Button - Always show when patients are loaded (icon only) */}
+              {patients.length > 0 && (
+                <DownloadButton 
+                  filename={selectedUploadId 
+                    ? (() => {
+                        const selectedUpload = availableFiles.find(f => f.id === selectedUploadId);
+                        return selectedUpload?.filename || currentFile;
+                      })()
+                    : currentFile}
+                  uploadId={selectedUploadId || undefined}
+                  disabled={patients.length === 0}
+                />
+              )}
+
             </div>
           </div>
 
@@ -380,6 +510,7 @@ export const UploadSection = ({
           onEndCall={onEndCall}
           onViewCallHistory={onViewCallHistory}
           onViewDetails={onViewDetails}
+          onUpdatePatient={handleUpdatePatient}
           activeCalls={activeCalls}
         />
       </div>

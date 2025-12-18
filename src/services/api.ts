@@ -501,6 +501,55 @@ export const getPatientsByUploadId = async (uploadId: number): Promise<{ success
   return response.data;
 };
 
+// Export AR Testing format CSV
+export const exportARTestingCSV = async (filename: string, uploadId?: number): Promise<Blob> => {
+  const params: { upload_id?: number } = {};
+  if (uploadId) {
+    params.upload_id = uploadId;
+  }
+  
+  const response = await api.get(`/export-ar-testing/${filename}`, {
+    params,
+    responseType: 'blob',
+  });
+  return response.data;
+};
+
+// Export selected patients as CSV
+export const exportSelectedPatients = async (invoiceIds: number[]): Promise<Blob> => {
+  const response = await api.post('/export-selected', invoiceIds, {
+    responseType: 'blob',
+  });
+  return response.data;
+};
+
+// Update patient/invoice fields
+export const updatePatient = async (
+  invoiceId: number,
+  updates: {
+    phone_number?: string;
+    patient_first_name?: string;
+    patient_last_name?: string;
+    patient_dob?: string;
+    patient_account_number?: string;
+    invoice_number?: string;
+    price?: string | number;
+    outstanding_amount?: string | number;
+    aging_bucket?: string;
+    insurance?: string;
+    network_status?: string;
+    eligibility_status?: string;
+    notes?: string;
+    comments?: string;
+    link_requested?: string;
+    link_sent?: string;
+    estimated_date?: string;
+  }
+): Promise<{ success: boolean; message: string; invoice_id: number; updated_fields: string[] }> => {
+  const response = await api.put(`/patients/${invoiceId}`, updates);
+  return response.data;
+};
+
 
 // Get calls grouped by date for calendar
 export const getCallsByDate = async (startDate?: string, endDate?: string): Promise<{ calls_by_date: Record<string, Array<{ patient_first_name: string; patient_last_name: string; invoice_number: string; called_at: string; call_status: string; outstanding_amount: number }>> }> => {

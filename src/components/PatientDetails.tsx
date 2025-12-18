@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { FiX, FiUser, FiFileText, FiShield } from 'react-icons/fi';
-import { getPatientDetails } from '../services/api';
+import { FiX, FiUser, FiFileText, FiShield, FiEdit2, FiCheck } from 'react-icons/fi';
+import { getPatientDetails, updatePatient } from '../services/api';
 import type { Patient } from '../types';
 
 interface PatientDetailsProps {
@@ -25,6 +25,9 @@ export const PatientDetails = ({
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingDOB, setEditingDOB] = useState(false);
+  const [dobValue, setDobValue] = useState('');
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     const fetchPatientDetails = async () => {
@@ -83,6 +86,34 @@ export const PatientDetails = ({
       fetchPatientDetails();
     }
   }, [invoiceId, phoneNumber, invoiceNumber, patientFirstName, patientLastName, isOpen]);
+
+  // Handle DOB update
+  const handleSaveDOB = async () => {
+    if (!patient?.id || updating) return;
+    
+    try {
+      setUpdating(true);
+      await updatePatient(patient.id, { patient_dob: dobValue });
+      // Refresh patient details
+      const response = await getPatientDetails(
+        invoiceId,
+        phoneNumber,
+        invoiceNumber,
+        patientFirstName,
+        patientLastName
+      );
+      if (response.success) {
+        setPatient(response.patient);
+      }
+      setEditingDOB(false);
+      setDobValue('');
+    } catch (error) {
+      console.error('Failed to update DOB:', error);
+      alert('Failed to update DOB. Please try again.');
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   // Always render the modal backdrop if isOpen is true, even if there's an error
   if (!isOpen) {
@@ -248,7 +279,78 @@ export const PatientDetails = ({
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Date of Birth</label>
-                <p className="text-gray-900">{formatDate(patient.patient_dob)}</p>
+                {editingDOB ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="text"
+                      value={dobValue}
+                      onChange={(e) => setDobValue(e.target.value)}
+                      placeholder="MM/DD/YYYY"
+                      className="flex-1 px-3 py-2 border border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
+                      autoFocus
+                      disabled={updating}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleSaveDOB();
+                        } else if (e.key === 'Escape') {
+                          setEditingDOB(false);
+                          setDobValue('');
+                        }
+                      }}
+                    />
+                    <button
+                      onClick={handleSaveDOB}
+                      disabled={updating}
+                      className="p-2 text-green-600 hover:text-green-800 disabled:opacity-50 transition-colors"
+                      title="Save"
+                    >
+                      <FiCheck size={18} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingDOB(false);
+                        setDobValue('');
+                      }}
+                      disabled={updating}
+                      className="p-2 text-red-600 hover:text-red-800 disabled:opacity-50 transition-colors"
+                      title="Cancel"
+                    >
+                      <FiX size={18} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 group">
+                    <p className="text-gray-900">{formatDate(patient.patient_dob)}</p>
+                    {patient.id && (
+                      <button
+                        onClick={() => {
+                          // Format DOB for editing (MM/DD/YYYY)
+                          if (patient.patient_dob) {
+                            try {
+                              const dateStr = patient.patient_dob;
+                              const parts = dateStr.includes('T') ? dateStr.split('T')[0].split('-') : dateStr.split('-');
+                              if (parts.length === 3) {
+                                const [year, month, day] = parts;
+                                setDobValue(`${month}/${day}/${year}`);
+                              } else {
+                                setDobValue(patient.patient_dob);
+                              }
+                            } catch {
+                              setDobValue(patient.patient_dob || '');
+                            }
+                          } else {
+                            setDobValue('');
+                          }
+                          setEditingDOB(true);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-teal-600 hover:text-teal-800 transition-opacity"
+                        title="Edit DOB"
+                      >
+                        <FiEdit2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Patient Account #</label>

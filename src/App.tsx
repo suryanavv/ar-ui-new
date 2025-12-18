@@ -71,6 +71,7 @@ function App() {
     availableFiles,
     handleFileUpload: handleFileUploadBase,
     loadAvailableFiles,
+    lastUploadResponse,
   } = useFileUpload({
     showMessage: (type, text) => showMessage(type, text),
     onUploadSuccess: async (filename, uploadId) => {
@@ -839,6 +840,9 @@ function App() {
                 onCallPatient={handleCallPatient}
                 onEndCall={handleEndCall}
                 onViewCallHistory={handleViewCallHistory}
+            onRefreshPatients={async () => {
+              await loadPatientData(selectedUploadId, true); // silent=true to avoid showing loading message
+            }}
                 onViewDetails={handleViewDetails}
               />
         )}

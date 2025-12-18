@@ -1,5 +1,5 @@
 import type { Patient } from '../types';
-import { FiEye, FiPhone, FiPhoneOff, FiFilter } from 'react-icons/fi';
+import { FiEye, FiPhone, FiPhoneOff, FiFilter, FiEdit2, FiCheck, FiX } from 'react-icons/fi';
 import { parseNotes } from '../utils/notesParser';
 import { useState } from 'react';
 
@@ -11,6 +11,7 @@ interface PatientTableProps {
   onEndCall?: (patient: Patient) => void;
   onViewCallHistory?: (patient: Patient) => void;
   onViewDetails?: (patient: Patient) => void;
+  onUpdatePatient?: (invoiceId: number, updates: Record<string, any>) => Promise<void>;
   activeCalls?: Map<string, { timestamp: number; conversationId?: string; callSid?: string; twilioStatus?: string }>;
 }
 
@@ -18,8 +19,174 @@ type SortColumn = 'name' | 'date';
 type SortDirection = 'asc' | 'desc';
 type SortConfig = { column: SortColumn; direction: SortDirection };
 
-export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, onEndCall, onViewCallHistory, onViewDetails, activeCalls = new Map() }: PatientTableProps) => {
+export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, onEndCall, onViewCallHistory, onViewDetails, onUpdatePatient, activeCalls = new Map() }: PatientTableProps) => {
   const [sortConfigs, setSortConfigs] = useState<SortConfig[]>([]);
+  const [editingCell, setEditingCell] = useState<{ patientId: number; field: string } | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+  const [updating, setUpdating] = useState(false);
+
+  // Format date for editing (MM/DD/YYYY)
+  const formatDateForEdit = (dateStr: string | undefined): string => {
+    if (!dateStr) return '';
+    try {
+      // Handle ISO format (YYYY-MM-DD)
+      if (dateStr.includes('T')) {
+        dateStr = dateStr.split('T')[0];
+      }
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const [year, month, day] = parts;
+        return `${month}/${day}/${year}`;
+      }
+      // If already in MM/DD/YYYY format, return as is
+      if (dateStr.includes('/')) {
+        return dateStr;
+      }
+      return dateStr;
+    } catch {
+      return dateStr || '';
+    }
+  };
+
+  // Handle cell editing
+  const handleStartEdit = (patient: Patient, field: string) => {
+    if (!onUpdatePatient || !patient.id) return;
+    
+    let value = '';
+    if (field === 'phone_number') {
+      value = patient.phone_number || '';
+    } else if (field === 'outstanding_amount') {
+      value = patient.outstanding_amount || '';
+    } else if (field === 'patient_name') {
+      // Combine first and last name for editing
+      const first = patient.patient_first_name || '';
+      const last = patient.patient_last_name || '';
+      value = `${first} ${last}`.trim();
+    }
+    
+    setEditingCell({ patientId: patient.id, field });
+    setEditValue(value);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCell(null);
+    setEditValue('');
+  };
+
+  const handleSaveEdit = async (patient: Patient) => {
+    if (!onUpdatePatient || !editingCell || !patient.id || updating) return;
+    
+    try {
+      setUpdating(true);
+      const updates: Record<string, any> = {};
+      
+      // For patient name, we need to handle first and last name separately
+      // But if editing "patient_name" (combined), we'll split it
+      if (editingCell.field === 'patient_name') {
+        const nameParts = editValue.trim().split(/\s+/);
+        if (nameParts.length >= 2) {
+          updates['patient_first_name'] = nameParts[0];
+          updates['patient_last_name'] = nameParts.slice(1).join(' ');
+        } else if (nameParts.length === 1) {
+          updates['patient_first_name'] = nameParts[0];
+          updates['patient_last_name'] = '';
+        }
+      } else {
+        updates[editingCell.field] = editValue;
+      }
+      
+      await onUpdatePatient(patient.id, updates);
+      setEditingCell(null);
+      setEditValue('');
+    } catch (error) {
+      console.error('Failed to update patient:', error);
+      alert('Failed to update patient. Please try again.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // Editable cell component
+  const EditableCell = ({ patient, field, displayValue, className = '' }: { 
+    patient: Patient; 
+    field: string; 
+    displayValue: string | React.ReactNode;
+    className?: string;
+  }) => {
+    const isEditing = editingCell?.patientId === patient.id && editingCell?.field === field;
+    
+    if (!onUpdatePatient || !patient.id) {
+      return <td className={className}>{displayValue}</td>;
+    }
+
+    if (isEditing) {
+      const isDateField = field === 'patient_dob';
+      return (
+        <td className={className}>
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSaveEdit(patient);
+                } else if (e.key === 'Escape') {
+                  handleCancelEdit();
+                }
+              }}
+              placeholder={isDateField ? "MM/DD/YYYY" : ""}
+              className="flex-1 px-2 py-1 text-sm border border-teal-500 rounded focus:outline-none focus:ring-1 focus:ring-teal-500"
+              autoFocus
+              disabled={updating}
+            />
+            <button
+              onClick={() => handleSaveEdit(patient)}
+              disabled={updating}
+              className="p-1 text-green-600 hover:text-green-800 disabled:opacity-50"
+              title="Save"
+            >
+              <FiCheck size={16} />
+            </button>
+            <button
+              onClick={handleCancelEdit}
+              disabled={updating}
+              className="p-1 text-red-600 hover:text-red-800 disabled:opacity-50"
+              title="Cancel"
+            >
+              <FiX size={16} />
+            </button>
+          </div>
+        </td>
+      );
+    }
+
+    return (
+      <td className={`${className} group relative`}>
+        <div className="flex items-center gap-1">
+          <div className="flex-1" onClick={(e) => {
+            // Don't trigger edit if clicking on a button inside (like "view details")
+            if ((e.target as HTMLElement).tagName === 'BUTTON') {
+              return;
+            }
+            handleStartEdit(patient, field);
+          }}>
+            {displayValue}
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleStartEdit(patient, field);
+            }}
+            className="opacity-0 group-hover:opacity-100 p-1 text-teal-600 hover:text-teal-800 transition-opacity"
+            title={`Edit ${field}`}
+          >
+            <FiEdit2 size={14} />
+          </button>
+        </div>
+      </td>
+    );
+  };
   // Helper function to create unique key for each patient record (same as in InvoiceList)
   const getPatientCallKey = (patient: Patient): string => {
     const phone = patient.phone_number || '';
@@ -359,34 +526,44 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
             {/* Complete Records */}
             {completePatients.map((patient, index) => (
               <tr key={`complete-${index}`} className="hover:bg-gray-50 transition-colors">
-                <td className="px-2 py-3 text-sm text-gray-900">
-                  {getFullName(patient) !== 'Unknown' ? (
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (onViewDetails) {
-                          onViewDetails(patient);
-                        }
-                      }}
-                      className="text-teal-600 hover:text-teal-800 hover:underline font-medium transition-colors cursor-pointer block w-full text-left break-words leading-tight"
-                      title={`Click to view full details for ${getFullName(patient)}`}
-                    >
-                      {getFullName(patient)}
-                    </button>
-                  ) : (
-                    <span className="text-red-500 italic font-semibold" title="Patient name is missing">Missing</span>
-                  )}
-                </td>
-                <td className="px-2 py-3 text-sm text-gray-900 font-medium">
-                  {patient.phone_number && patient.phone_number.toLowerCase() !== 'nan' && patient.phone_number.length >= 10 ? (
-                    patient.phone_number
-                  ) : (
-                    <span className="text-red-500 italic font-semibold" title="Phone number is missing or invalid">
-                      Missing
-                    </span>
-                  )}
-                </td>
+                <EditableCell
+                  patient={patient}
+                  field="patient_name"
+                  displayValue={
+                    getFullName(patient) !== 'Unknown' ? (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (onViewDetails) {
+                            onViewDetails(patient);
+                          }
+                        }}
+                        className="text-teal-600 hover:text-teal-800 hover:underline font-medium transition-colors cursor-pointer block w-full text-left break-words leading-tight"
+                        title={`Click to view full details for ${getFullName(patient)}`}
+                      >
+                        {getFullName(patient)}
+                      </button>
+                    ) : (
+                      <span className="text-red-500 italic font-semibold" title="Patient name is missing">Missing</span>
+                    )
+                  }
+                  className="px-2 py-3 text-sm text-gray-900"
+                />
+                <EditableCell
+                  patient={patient}
+                  field="phone_number"
+                  displayValue={
+                    patient.phone_number && patient.phone_number.toLowerCase() !== 'nan' && patient.phone_number.length >= 10 ? (
+                      patient.phone_number
+                    ) : (
+                      <span className="text-red-500 italic font-semibold" title="Phone number is missing or invalid">
+                        Missing
+                      </span>
+                    )
+                  }
+                  className="px-2 py-3 text-sm text-gray-900 font-medium"
+                />
                 <td className="px-2 py-3 text-sm text-gray-700">
                   {patient.invoice_date ? (
                     formatDateString(patient.invoice_date)
@@ -395,20 +572,25 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                   )}
                 </td>
                 <td className="px-2 py-3 text-sm text-gray-900 font-semibold">{patient.price}</td>
-                <td className="px-2 py-3 text-sm">
-                  {isPaid(patient) ? (
-                    <div className="flex flex-col">
-                      <span className="text-emerald-600 font-bold text-sm">Paid</span>
-                      <span className="text-xs text-gray-600">
-                        {formatCurrency(patient.amount_paid || '0')}
-                      </span>
-                    </div>
-                  ) : patient.outstanding_amount && patient.outstanding_amount !== '' ? (
-                    <span className="text-red-600 font-bold">{patient.outstanding_amount}</span>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
-                </td>
+                <EditableCell
+                  patient={patient}
+                  field="outstanding_amount"
+                  displayValue={
+                    isPaid(patient) ? (
+                      <div className="flex flex-col">
+                        <span className="text-emerald-600 font-bold text-sm">Paid</span>
+                        <span className="text-xs text-gray-600">
+                          {formatCurrency(patient.amount_paid || '0')}
+                        </span>
+                      </div>
+                    ) : patient.outstanding_amount && patient.outstanding_amount !== '' ? (
+                      <span className="text-red-600 font-bold">{patient.outstanding_amount}</span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )
+                  }
+                  className="px-2 py-3 text-sm"
+                />
                 <td className="px-2 py-3 text-sm text-center">
                   {patient.link_requested ? (
                     patient.link_requested.toLowerCase() === 'yes' ? (
@@ -690,34 +872,44 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
             {/* Missing Records */}
             {missingPatients.map((patient, index) => (
               <tr key={`missing-${index}`} className="hover:bg-gray-50 transition-colors bg-red-50/30">
-                <td className="px-2 py-3 text-sm text-gray-900">
-                  {getFullName(patient) !== 'Unknown' ? (
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (onViewDetails) {
-                          onViewDetails(patient);
-                        }
-                      }}
-                      className="text-teal-600 hover:text-teal-800 hover:underline font-medium transition-colors cursor-pointer block w-full text-left break-words leading-tight"
-                      title={`Click to view full details for ${getFullName(patient)}`}
-                    >
-                      {getFullName(patient)}
-                    </button>
-                  ) : (
-                    <span className="text-red-500 italic font-semibold" title="Patient name is missing">Missing</span>
-                  )}
-                </td>
-                <td className="px-2 py-3 text-sm text-gray-900 font-medium">
-                  {patient.phone_number && patient.phone_number.toLowerCase() !== 'nan' && patient.phone_number.length >= 10 ? (
-                    patient.phone_number
-                  ) : (
-                    <span className="text-red-500 italic font-semibold" title="Phone number is missing or invalid">
-                      Missing
-                    </span>
-                  )}
-                </td>
+                <EditableCell
+                  patient={patient}
+                  field="patient_name"
+                  displayValue={
+                    getFullName(patient) !== 'Unknown' ? (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (onViewDetails) {
+                            onViewDetails(patient);
+                          }
+                        }}
+                        className="text-teal-600 hover:text-teal-800 hover:underline font-medium transition-colors cursor-pointer block w-full text-left break-words leading-tight"
+                        title={`Click to view full details for ${getFullName(patient)}`}
+                      >
+                        {getFullName(patient)}
+                      </button>
+                    ) : (
+                      <span className="text-red-500 italic font-semibold" title="Patient name is missing">Missing</span>
+                    )
+                  }
+                  className="px-2 py-3 text-sm text-gray-900"
+                />
+                <EditableCell
+                  patient={patient}
+                  field="phone_number"
+                  displayValue={
+                    patient.phone_number && patient.phone_number.toLowerCase() !== 'nan' && patient.phone_number.length >= 10 ? (
+                      patient.phone_number
+                    ) : (
+                      <span className="text-red-500 italic font-semibold" title="Phone number is missing or invalid">
+                        Missing
+                      </span>
+                    )
+                  }
+                  className="px-2 py-3 text-sm text-gray-900 font-medium"
+                />
                 <td className="px-2 py-3 text-sm text-gray-700">
                   {patient.invoice_date ? (
                     formatDateString(patient.invoice_date)
@@ -726,20 +918,25 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                   )}
                 </td>
                 <td className="px-2 py-3 text-sm text-gray-900 font-semibold">{patient.price}</td>
-                <td className="px-2 py-3 text-sm">
-                  {isPaid(patient) ? (
-                    <div className="flex flex-col">
-                      <span className="text-emerald-600 font-bold text-sm">Paid</span>
-                      <span className="text-xs text-gray-600">
-                        {formatCurrency(patient.amount_paid || '0')}
-                      </span>
-                    </div>
-                  ) : patient.outstanding_amount && patient.outstanding_amount !== '' ? (
-                    <span className="text-red-600 font-bold">{patient.outstanding_amount}</span>
-                  ) : (
-                    <span className="text-gray-400">-</span>
-                  )}
-                </td>
+                <EditableCell
+                  patient={patient}
+                  field="outstanding_amount"
+                  displayValue={
+                    isPaid(patient) ? (
+                      <div className="flex flex-col">
+                        <span className="text-emerald-600 font-bold text-sm">Paid</span>
+                        <span className="text-xs text-gray-600">
+                          {formatCurrency(patient.amount_paid || '0')}
+                        </span>
+                      </div>
+                    ) : patient.outstanding_amount && patient.outstanding_amount !== '' ? (
+                      <span className="text-red-600 font-bold">{patient.outstanding_amount}</span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )
+                  }
+                  className="px-2 py-3 text-sm"
+                />
                 <td className="px-2 py-3 text-sm text-center">
                   {patient.link_requested ? (
                     patient.link_requested.toLowerCase() === 'yes' ? (

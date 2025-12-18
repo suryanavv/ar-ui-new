@@ -105,14 +105,14 @@ export const DownloadButton = ({ filename, uploadId, disabled }: DownloadButtonP
     <button
       onClick={handleDownload}
       disabled={disabled || downloading}
-      className={`inline-flex items-center gap-2 px-6 py-3 border-2 border-teal-700 text-teal-700 rounded-xl font-semibold transition-all ${
+      className={`inline-flex items-center justify-center p-2 border-2 border-teal-700 text-teal-700 rounded-lg transition-all ${
         disabled || downloading
           ? 'opacity-60 cursor-not-allowed border-gray-400 text-gray-400' 
-          : 'hover:bg-teal-50 hover:shadow-lg hover:-translate-y-0.5'
+          : 'hover:bg-teal-50 hover:shadow-sm'
       }`}
+      title={downloading ? 'Downloading...' : 'Export Results'}
     >
       <FiDownload size={18} />
-      <span>{downloading ? 'Downloading...' : 'Export CSV'}</span>
     </button>
   );
 };

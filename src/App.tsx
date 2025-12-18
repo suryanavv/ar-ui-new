@@ -71,7 +71,6 @@ function App() {
     availableFiles,
     handleFileUpload: handleFileUploadBase,
     loadAvailableFiles,
-    lastUploadResponse,
   } = useFileUpload({
     showMessage: (type, text) => showMessage(type, text),
     onUploadSuccess: async (filename, uploadId) => {

@@ -25,29 +25,6 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
   const [editValue, setEditValue] = useState<string>('');
   const [updating, setUpdating] = useState(false);
 
-  // Format date for editing (MM/DD/YYYY)
-  const formatDateForEdit = (dateStr: string | undefined): string => {
-    if (!dateStr) return '';
-    try {
-      // Handle ISO format (YYYY-MM-DD)
-      if (dateStr.includes('T')) {
-        dateStr = dateStr.split('T')[0];
-      }
-      const parts = dateStr.split('-');
-      if (parts.length === 3) {
-        const [year, month, day] = parts;
-        return `${month}/${day}/${year}`;
-      }
-      // If already in MM/DD/YYYY format, return as is
-      if (dateStr.includes('/')) {
-        return dateStr;
-      }
-      return dateStr;
-    } catch {
-      return dateStr || '';
-    }
-  };
-
   // Handle cell editing
   const handleStartEdit = (patient: Patient, field: string) => {
     if (!onUpdatePatient || !patient.id) return;

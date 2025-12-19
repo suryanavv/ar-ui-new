@@ -34,6 +34,8 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
       value = patient.phone_number || '';
     } else if (field === 'outstanding_amount') {
       value = patient.outstanding_amount || '';
+    } else if (field === 'price') {
+      value = patient.price || '';
     } else if (field === 'patient_name') {
       // Combine first and last name for editing
       const first = patient.patient_first_name || '';
@@ -548,7 +550,18 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                     <span className="text-gray-400">-</span>
                   )}
                 </td>
-                <td className="px-2 py-3 text-sm text-gray-900 font-semibold">{patient.price}</td>
+                <EditableCell
+                  patient={patient}
+                  field="price"
+                  displayValue={
+                    patient.price ? (
+                      <span className="text-gray-900 font-semibold">{formatCurrency(patient.price)}</span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )
+                  }
+                  className="px-2 py-3 text-sm"
+                />
                 <EditableCell
                   patient={patient}
                   field="outstanding_amount"
@@ -894,7 +907,18 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
                     <span className="text-gray-400">-</span>
                   )}
                 </td>
-                <td className="px-2 py-3 text-sm text-gray-900 font-semibold">{patient.price}</td>
+                <EditableCell
+                  patient={patient}
+                  field="price"
+                  displayValue={
+                    patient.price ? (
+                      <span className="text-gray-900 font-semibold">{formatCurrency(patient.price)}</span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )
+                  }
+                  className="px-2 py-3 text-sm"
+                />
                 <EditableCell
                   patient={patient}
                   field="outstanding_amount"

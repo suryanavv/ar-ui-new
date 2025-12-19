@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getFileUploadHistory, getPatientsByUploadId, callPatient, endCall, getCallStatus } from '../services/api';
+import { getFileUploadHistory, getPatientsByUploadId, callPatient, endCall, getCallStatus, updatePatient } from '../services/api';
 import type { Patient } from '../types';
 import { formatDateTime } from '../utils/timezone';
 import { PatientTable } from './PatientTable';
@@ -118,6 +118,26 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
   const handleBack = () => {
     setSelectedUploadId(null);
     setPatients([]);
+  };
+
+  const handleUpdatePatient = async (invoiceId: number, updates: Record<string, any>) => {
+    try {
+      await updatePatient(invoiceId, updates);
+      showMessage('success', 'Patient updated successfully');
+      // Refresh patient data
+      if (selectedUploadId) {
+        const response = await getPatientsByUploadId(selectedUploadId);
+        setPatients(response.patients || []);
+      }
+      // Refresh dashboard if available
+      if (typeof (window as { refreshDashboard?: () => void }).refreshDashboard === 'function') {
+        (window as { refreshDashboard?: () => void }).refreshDashboard();
+      }
+    } catch (error) {
+      console.error('Failed to update patient:', error);
+      showMessage('error', 'Failed to update patient. Please try again.');
+      throw error;
+    }
   };
 
   const handleViewNotes = (patient: Patient) => {
@@ -453,6 +473,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
                 onEndCall={handleEndCall}
                 onViewCallHistory={handleViewCallHistory}
                 onViewDetails={handleViewDetails}
+                onUpdatePatient={handleUpdatePatient}
                 activeCalls={activeCalls}
               />
             </div>

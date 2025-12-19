@@ -130,8 +130,9 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
         setPatients(response.patients || []);
       }
       // Refresh dashboard if available
-      if (typeof (window as { refreshDashboard?: () => void }).refreshDashboard === 'function') {
-        (window as { refreshDashboard?: () => void }).refreshDashboard();
+      const refreshDashboard = (window as { refreshDashboard?: () => void }).refreshDashboard;
+      if (typeof refreshDashboard === 'function') {
+        refreshDashboard();
       }
     } catch (error) {
       console.error('Failed to update patient:', error);

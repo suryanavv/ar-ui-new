@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { FiCheckCircle, FiXCircle, FiInfo, FiX } from 'react-icons/fi';
 
 export type ToastType = 'success' | 'error' | 'info';
@@ -33,18 +33,32 @@ interface ToastItemProps {
 
 const ToastItem = ({ toast, onRemove }: ToastItemProps) => {
   const [isVisible, setIsVisible] = useState(false);
+  const fadeOutTimerRef = useRef<number | null>(null);
+  const mainTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Trigger fade-in animation
     setTimeout(() => setIsVisible(true), 10);
     
-    // Auto-remove after 4 seconds
-    const timer = setTimeout(() => {
+    // Auto-remove after 5 seconds
+    mainTimerRef.current = setTimeout(() => {
       setIsVisible(false);
-      setTimeout(() => onRemove(toast.id), 300); // Wait for fade-out
-    }, 4000);
+      fadeOutTimerRef.current = setTimeout(() => {
+        onRemove(toast.id);
+        fadeOutTimerRef.current = null;
+      }, 300); // Wait for fade-out
+    }, 5000);
 
-    return () => clearTimeout(timer);
+    return () => {
+      if (mainTimerRef.current) {
+        clearTimeout(mainTimerRef.current);
+        mainTimerRef.current = null;
+      }
+      if (fadeOutTimerRef.current) {
+        clearTimeout(fadeOutTimerRef.current);
+        fadeOutTimerRef.current = null;
+      }
+    };
   }, [toast.id, onRemove]);
 
   const styles = {
@@ -74,6 +88,15 @@ const ToastItem = ({ toast, onRemove }: ToastItemProps) => {
       <button
         onClick={() => {
           setIsVisible(false);
+          // Clear any pending timers
+          if (mainTimerRef.current) {
+            clearTimeout(mainTimerRef.current);
+            mainTimerRef.current = null;
+          }
+          if (fadeOutTimerRef.current) {
+            clearTimeout(fadeOutTimerRef.current);
+            fadeOutTimerRef.current = null;
+          }
           setTimeout(() => onRemove(toast.id), 300);
         }}
         className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
@@ -96,9 +119,9 @@ export const useToast = () => {
     return id;
   };
 
-  const removeToast = (id: number) => {
+  const removeToast = useCallback((id: number) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  };
+  }, []);
 
   return { toasts, showToast, removeToast };
 };

@@ -506,6 +506,15 @@ function App() {
                     } catch (error) {
                       console.error('Failed to refresh patient data after batch calls:', error);
                     }
+                    
+                    // Refresh file upload history to update call statuses
+                    try {
+                      await loadAvailableFiles();
+                      console.log(`✅ File upload history refreshed after all batch calls completed`);
+                    } catch (error) {
+                      console.error('Failed to refresh file upload history after batch calls:', error);
+                    }
+                    
                     // Clear progress after a short delay
                     setTimeout(() => setBatchCallProgress(null), 3000);
                   }
@@ -703,7 +712,20 @@ function App() {
                   // Call has ended - stop polling and remove from activeCalls
                   // Refresh patient data one final time to get latest status
                   const currentUploadId = getSelectedUploadId();
-                  await loadPatientData(currentUploadId, true);
+                  try {
+                    await loadPatientData(currentUploadId, true); // silent=true to avoid showing loading message
+                    console.log(`✅ Patient data refreshed immediately after single call completed (uploadId: ${currentUploadId || 'all patients'})`);
+                  } catch (error) {
+                    console.error('Failed to refresh patient data after single call:', error);
+                  }
+                  
+                  // Refresh file upload history to update call statuses
+                  try {
+                    await loadAvailableFiles();
+                    console.log(`✅ File upload history refreshed after single call completed`);
+                  } catch (error) {
+                    console.error('Failed to refresh file upload history after single call:', error);
+                  }
                   
                   // Remove from activeCalls and stop polling
                   setActiveCalls(prev => {

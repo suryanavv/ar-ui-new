@@ -19,7 +19,8 @@ interface UploadSectionProps {
   loading: boolean;
   uploadLoading: boolean;
   callingInProgress: boolean;
-  activeCalls: Map<string, { timestamp: number; conversationId?: string }>;
+  activeCalls: Map<string, { timestamp: number; conversationId?: string; callSid?: string; twilioStatus?: string }>;
+  batchCallProgress: { total: number; completed: number } | null;
   currentFile: string;
   onFileUpload: (file: File) => Promise<void>;
   onFileSelect: (uploadId: number | null) => Promise<void>;
@@ -42,6 +43,7 @@ export const UploadSection = ({
   uploadLoading,
   callingInProgress,
   activeCalls,
+  batchCallProgress,
   currentFile,
   onFileUpload,
   onFileSelect,
@@ -287,6 +289,33 @@ export const UploadSection = ({
                 </span>
               </div>
             </div>
+            
+            {/* Batch Call Progress Bar */}
+            {batchCallProgress && batchCallProgress.total > 0 && (
+              <div className="mb-3 p-4 bg-teal-50 border border-teal-200 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-teal-900">
+                    Batch Call Progress
+                  </span>
+                  <span className="text-sm font-medium text-teal-700">
+                    {batchCallProgress.completed} / {batchCallProgress.total} completed
+                  </span>
+                </div>
+                <div className="w-full bg-teal-200 rounded-full h-3 overflow-hidden">
+                  <div
+                    className="bg-teal-600 h-full rounded-full transition-all duration-500 ease-out"
+                    style={{
+                      width: `${Math.min(100, (batchCallProgress.completed / batchCallProgress.total) * 100)}%`
+                    }}
+                  />
+                </div>
+                <div className="mt-2 text-xs text-teal-700">
+                  {batchCallProgress.completed === batchCallProgress.total
+                    ? 'All calls completed!'
+                    : `Processing ${batchCallProgress.total - batchCallProgress.completed} remaining call${batchCallProgress.total - batchCallProgress.completed !== 1 ? 's' : ''}...`}
+                </div>
+              </div>
+            )}
             
             <div className="flex gap-2 flex-wrap">
               <BatchCallButton 

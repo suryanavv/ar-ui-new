@@ -342,47 +342,73 @@ export const callPatient = async (
   return response.data;
 };
 
-// Get real-time call status from Twilio and ElevenLabs
-export const getCallStatus = async (callSid: string): Promise<{
+// Unified call status endpoint - handles both single and batch calls
+// Returns simplified response with only call_sid, status, and should_stop_polling
+// For single call: pass array with one call_sid
+// For batch calls: pass array with multiple call_sids
+export const getCallStatus = async (callSids: string | string[]): Promise<{
   success: boolean;
-  call_sid: string;
-  should_stop_polling?: boolean; // Explicit flag indicating polling should stop
-  twilio: {
-    success: boolean;
+  results: Record<string, {
     call_sid: string;
-    status: string; // queued, ringing, in-progress, completed, busy, failed, no-answer, canceled
-    duration: number | null;
-    start_time: string | null;
-    end_time: string | null;
-    direction: string;
-    from_number: string;
-    to_number: string;
-  } | null;
-  elevenlabs: {
-    success: boolean;
-    conversation_id: string;
+    status: string; // queued, ringing, in-progress, completed, busy, failed, no-answer, canceled, error, not_found
+    should_stop_polling: boolean;
+    error?: string;
+  }>;
+  all_completed: boolean; // True if all calls are completed
+  // Single call response format (for backward compatibility when single call)
+  call_sid?: string;
+  status?: string;
+  should_stop_polling?: boolean;
+  twilio?: {
     status: string;
-    metadata: Record<string, unknown>;
   } | null;
-  database: {
-    call_status: string;
-    conversation_id: string | null;
-    notes: string;
-    called_at: string | null;
-    patient_first_name: string;
-    patient_last_name: string;
-    invoice_number: string;
-    phone_number: string;
-  };
 }> => {
   // Ensure we have an access token before polling; prevents noisy 401s
   const token = localStorage.getItem('access_token');
   if (!token) {
     throw new Error('Missing access token');
   }
-  const response = await api.get(`/status/${callSid}`);
-  return response.data;
+  
+  // Normalize to array
+  const callSidsArray = Array.isArray(callSids) ? callSids : [callSids];
+  
+  if (callSidsArray.length === 0) {
+    return {
+      success: true,
+      results: {},
+      all_completed: true
+    };
+  }
+  
+  // Use unified POST /status endpoint
+  const response = await api.post('/status', {
+    call_sids: callSidsArray
+  });
+  
+  const data = response.data;
+  
+  // If single call, also return in old format for backward compatibility
+  if (callSidsArray.length === 1 && data.results) {
+    const singleResult = data.results[callSidsArray[0]];
+    if (singleResult) {
+      return {
+        ...data,
+        // Add single-call format fields for backward compatibility
+        call_sid: singleResult.call_sid,
+        status: singleResult.status,
+        should_stop_polling: singleResult.should_stop_polling,
+        twilio: {
+          status: singleResult.status
+        }
+      };
+    }
+  }
+  
+  return data;
 };
+
+// Alias for batch calls (for clarity in code)
+export const getBatchCallStatus = getCallStatus;
 
 // End an active call by conversation ID
 export const endCall = async (conversationId: string): Promise<{

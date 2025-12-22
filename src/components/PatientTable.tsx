@@ -11,7 +11,7 @@ interface PatientTableProps {
   onEndCall?: (patient: Patient) => void;
   onViewCallHistory?: (patient: Patient) => void;
   onViewDetails?: (patient: Patient) => void;
-  onUpdatePatient?: (invoiceId: number, updates: Record<string, any>) => Promise<void>;
+  onUpdatePatient?: (invoiceId: number, updates: Record<string, string | number>) => Promise<void>;
   activeCalls?: Map<string, { timestamp: number; conversationId?: string; callSid?: string; twilioStatus?: string }>;
   selectedPatientIds?: Set<number>;
   onSelectionChange?: (selectedIds: Set<number>) => void;
@@ -60,7 +60,7 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
     
     try {
       setUpdating(true);
-      const updates: Record<string, any> = {};
+      const updates: Record<string, string | number> = {};
       
       // For patient name, we need to handle first and last name separately
       // But if editing "patient_name" (combined), we'll split it
@@ -179,22 +179,22 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
   };
 
   // Check if call is currently active (shows "Calling..." button)
-  // Uses real-time Twilio status to determine if call is active
+  // Uses API status from activeCalls (updated by polling) to determine if call is active
   const isCallActive = (patient: Patient): boolean => {
     const callKey = getPatientCallKey(patient);
     if (!callKey || !activeCalls.has(callKey)) return false;
     
     const callData = activeCalls.get(callKey)!;
     
-    // Check real-time Twilio status if available
+    // Check real-time API status if available (from status endpoint polling)
     if (callData.twilioStatus) {
       // Show "Calling..." for: queued, ringing, in-progress
-      // Hide for: completed, busy, failed, no-answer, canceled
-      const callIsActive = !['completed', 'busy', 'failed', 'no-answer', 'canceled'].includes(callData.twilioStatus);
-      return callIsActive;
+      // Hide for: completed, busy, failed, no-answer, canceled, error, not_found
+      const activeStatuses = ['queued', 'ringing', 'in-progress'];
+      return activeStatuses.includes(callData.twilioStatus.toLowerCase());
     }
     
-    // Fallback: If no Twilio status yet, check time and database status
+    // Fallback: If no API status yet, check time and database status
     const now = Date.now();
     const timeSinceCall = now - callData.timestamp;
     
@@ -229,25 +229,26 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
     return true;
   };
 
-  // Check if disconnect button should be disabled
-  // Disable ONLY when call has ended (based on real-time Twilio status)
+  // Check if disconnect button should be disabled (shows "Processing..." when disabled)
+  // Disable when call has ended (based on API status from status endpoint)
   const isDisconnectButtonDisabled = (patient: Patient): boolean => {
     const callKey = getPatientCallKey(patient);
     const callData = activeCalls.get(callKey);
     
     if (!callData) return false;
     
-    // Check real-time Twilio status if available
+    // Check real-time API status if available (from status endpoint polling)
     if (callData.twilioStatus) {
-      const twilioStatus = callData.twilioStatus;
+      const apiStatus = callData.twilioStatus.toLowerCase();
       
-      // Disable if call has ended (completed, failed, busy, no-answer, canceled)
-      // Enable for: queued, ringing, in-progress
-      const callHasEnded = ['completed', 'busy', 'failed', 'no-answer', 'canceled'].includes(twilioStatus);
+      // Disable (show "Processing...") if call has ended
+      // Statuses: completed, busy, failed, no-answer, canceled, error, not_found
+      // Enable (show "Disconnect") for: queued, ringing, in-progress, unknown
+      const callHasEnded = ['completed', 'busy', 'failed', 'no-answer', 'canceled', 'error', 'not_found'].includes(apiStatus);
       return callHasEnded;
     }
     
-    // Fallback: If no Twilio status yet, check database status
+    // Fallback: If no API status yet, check database status
     // But keep enabled for first 10 seconds (call initiating)
     const now = Date.now();
     const timeSinceCall = now - callData.timestamp;
@@ -256,12 +257,12 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
       return false; // Keep enabled while call is initiating
     }
     
-    // If database shows completed/failed after 10 seconds, disable
+    // If database shows completed/failed after 10 seconds, disable (show "Processing...")
     if (patient.call_status === 'completed' || patient.call_status === 'failed') {
       return true;
     }
     
-    // Otherwise, keep button enabled
+    // Otherwise, keep button enabled (show "Disconnect")
     return false;
   };
 
@@ -333,33 +334,6 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
     return !phone || !hasValidFirstName || !hasValidLastName;
   };
 
-  // Check if patient is a "no call option" record
-  // A record is "no call option" if:
-  // - Patient name is "Unknown" OR
-  // - DOB is missing/unknown OR
-  // - Phone number is missing/unknown OR
-  // - Outstanding amount is 0 or missing
-  // Checkboxes should NOT be shown for "no call option" records
-  const isNoCallOption = (patient: Patient): boolean => {
-    const fullName = getFullName(patient);
-    const isNameUnknown = fullName === 'Unknown';
-    
-    const hasValidPhone = patient.phone_number && 
-      patient.phone_number.toLowerCase() !== 'nan' && 
-      patient.phone_number.length >= 10;
-    
-    const hasValidDOB = patient.patient_dob && 
-      patient.patient_dob.toLowerCase() !== 'nan' && 
-      patient.patient_dob.trim() !== '';
-    
-    const outstandingAmount = parseFloat(patient.outstanding_amount || '0');
-    const hasOutstanding = outstandingAmount > 0;
-    
-    // If all three (name, DOB, phone) are present AND outstanding amount is not 0, it's NOT a "no call option"
-    // Otherwise, it IS a "no call option"
-    return isNameUnknown || !hasValidPhone || !hasValidDOB || !hasOutstanding;
-  };
-
   // Handle patient selection
   const handlePatientToggle = (patientId: number | undefined) => {
     if (!onSelectionChange || !patientId) return;
@@ -377,9 +351,8 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
   const handleSelectAll = () => {
     if (!onSelectionChange) return;
     
-    // Only consider patients that are NOT "no call option" records
     const visiblePatientIds = patients
-      .filter(p => p.id !== undefined && !isNoCallOption(p))
+      .filter(p => p.id !== undefined)
       .map(p => p.id as number);
     
     const allSelected = visiblePatientIds.every(id => selectedPatientIds.has(id));
@@ -397,13 +370,13 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
     }
   };
 
-  // Check if all visible patients (excluding "no call option" records) are selected
-  const selectablePatients = patients.filter(p => p.id !== undefined && !isNoCallOption(p));
-  const allVisibleSelected = selectablePatients.length > 0 && selectablePatients
+  // Check if all visible patients are selected
+  const allVisibleSelected = patients.length > 0 && patients
+    .filter(p => p.id !== undefined)
     .every(p => selectedPatientIds.has(p.id as number));
 
   // Check if some (but not all) visible patients are selected
-  const someVisibleSelected = selectablePatients.some(p => selectedPatientIds.has(p.id as number));
+  const someVisibleSelected = patients.some(p => p.id !== undefined && selectedPatientIds.has(p.id as number));
 
   // Set indeterminate state on select all checkbox
   useEffect(() => {
@@ -600,7 +573,7 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
             {completePatients.map((patient, index) => (
               <tr key={`complete-${index}`} className={`hover:bg-gray-50 transition-colors ${selectedPatientIds.has(patient.id as number) ? 'bg-teal-50' : ''}`}>
                 <td className="px-2 py-3 text-center">
-                  {onSelectionChange && patient.id !== undefined && !isNoCallOption(patient) && (
+                  {onSelectionChange && patient.id !== undefined && (
                     <input
                       type="checkbox"
                       checked={selectedPatientIds.has(patient.id)}
@@ -968,7 +941,7 @@ export const PatientTable = ({ patients, loading, onViewNotes, onCallPatient, on
             {missingPatients.map((patient, index) => (
               <tr key={`missing-${index}`} className={`hover:bg-gray-50 transition-colors bg-red-50/30 ${selectedPatientIds.has(patient.id as number) ? 'bg-teal-50' : ''}`}>
                 <td className="px-2 py-3 text-center">
-                  {onSelectionChange && patient.id !== undefined && !isNoCallOption(patient) && (
+                  {onSelectionChange && patient.id !== undefined && (
                     <input
                       type="checkbox"
                       checked={selectedPatientIds.has(patient.id)}

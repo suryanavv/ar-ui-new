@@ -1,9 +1,23 @@
-import { useEffect, useState, useRef } from 'react';
-import { getDashboardStats, getPatientsByAgingBucket } from '../services/api';
-import { CalendarView } from './CalendarView';
-import { formatDateTime } from '../utils/timezone';
-import { FiChevronDown, FiCheck, FiX } from 'react-icons/fi';
-import type { Patient } from '../types';
+import { useEffect, useState } from 'react';
+import type React from 'react';
+import { getDashboardStats, getCallsByDate } from '../services/api';
+import { formatDateTime, formatDateKey, formatTime, groupCallsByLocalDate } from '../utils/timezone';
+import {
+  FiX,
+  FiFileText,
+  FiUsers,
+  FiDollarSign,
+  FiCheckCircle,
+  FiPhone,
+  FiLink,
+  FiCalendar,
+  FiActivity,
+  FiUpload,
+  FiChevronLeft,
+  FiChevronRight
+} from 'react-icons/fi';
+import type { CalendarCall } from '../types';
+import { Button } from './ui/button';
 
 interface DashboardStats {
   total_invoices: number;
@@ -41,16 +55,27 @@ interface DashboardStats {
   }>;
 }
 
+
+
+const months = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+
+
 export const Dashboard = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [showPaidPatientsModal, setShowPaidPatientsModal] = useState(false);
-  const [selectedAgingBucket, setSelectedAgingBucket] = useState<string | null>(null);
-  const [isAgingDropdownOpen, setIsAgingDropdownOpen] = useState(false);
-  const agingDropdownRef = useRef<HTMLDivElement>(null);
-  const [showAgingBucketModal, setShowAgingBucketModal] = useState(false);
-  const [agingBucketPatients, setAgingBucketPatients] = useState<Patient[]>([]);
-  const [loadingAgingPatients, setLoadingAgingPatients] = useState(false);
+
+  // Calendar state
+  const [currentMonth, setCurrentMonth] = useState(() => new Date().getMonth() + 1);
+  const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
+  const [selectedDate, setSelectedDate] = useState<number | null>(() => new Date().getDate());
+  const [selectedDateCalls, setSelectedDateCalls] = useState<CalendarCall[]>([]);
+  const [loadingCalls, setLoadingCalls] = useState(false);
+  const [highlightedDates, setHighlightedDates] = useState<Set<string>>(new Set());
 
   const loadStats = async () => {
     try {
@@ -65,32 +90,69 @@ export const Dashboard = () => {
     }
   };
 
-  // Initial load only - no auto-refresh
+  // Load calendar data for current month
+  const loadCalendarData = async () => {
+    try {
+      const start = new Date(currentYear, currentMonth - 1, 1);
+      const end = new Date(currentYear, currentMonth, 0);
+
+      const response = await getCallsByDate(
+        formatDateKey(start),
+        formatDateKey(end)
+      );
+
+      const localCallsByDate = groupCallsByLocalDate(response.calls_by_date || {});
+      setHighlightedDates(new Set(Object.keys(localCallsByDate)));
+    } catch (error) {
+      console.error('Failed to load calendar data:', error);
+    }
+  };
+
+  // Load calls for selected date
+  const loadCallsForDate = async (date: number) => {
+    setLoadingCalls(true);
+    try {
+      const dateKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+      const prevDate = new Date(currentYear, currentMonth - 1, date - 1);
+      const nextDate = new Date(currentYear, currentMonth - 1, date + 1);
+
+      const response = await getCallsByDate(
+        formatDateKey(prevDate),
+        formatDateKey(nextDate)
+      );
+
+      const localCallsByDate = groupCallsByLocalDate(response.calls_by_date || {});
+      setSelectedDateCalls(localCallsByDate[dateKey] || []);
+    } catch (error) {
+      console.error('Failed to load calls for date:', error);
+      setSelectedDateCalls([]);
+    } finally {
+      setLoadingCalls(false);
+    }
+  };
+
+  // Initial load
   useEffect(() => {
     loadStats();
   }, []);
 
-  // Handle click outside to close aging bucket dropdown
+  // Load calendar data when month changes
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (agingDropdownRef.current && !agingDropdownRef.current.contains(event.target as Node)) {
-        setIsAgingDropdownOpen(false);
-      }
-    };
+    loadCalendarData();
+  }, [currentMonth, currentYear]);
 
-    if (isAgingDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-      };
+  // Load calls when date is selected
+  useEffect(() => {
+    if (selectedDate) {
+      loadCallsForDate(selectedDate);
     }
-  }, [isAgingDropdownOpen]);
+  }, [selectedDate, currentMonth, currentYear]);
 
-
-  // Expose refresh function so parent can trigger manual refresh
+  // Expose refresh function
   useEffect(() => {
     const dashboardRefresh = () => {
       loadStats();
+      loadCalendarData();
     };
     (window as { refreshDashboard?: () => void }).refreshDashboard = dashboardRefresh;
     return () => {
@@ -98,28 +160,79 @@ export const Dashboard = () => {
     };
   }, []);
 
-  if (loading) {
-    return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
-        </div>
-      </div>
-    );
-  }
+  // Generate calendar grid
+  const generateCalendarGrid = () => {
+    const firstDay = new Date(currentYear, currentMonth - 1, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+    const daysInPrevMonth = new Date(currentYear, currentMonth - 1, 0).getDate();
 
-  if (!stats) {
-    return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="text-center py-8">
-          <p className="text-gray-500">Unable to load dashboard statistics</p>
-        </div>
-      </div>
-    );
-  }
+    const calendar: Array<{ date: number; isCurrentMonth: boolean; isToday: boolean; hasCalls: boolean }> = [];
 
-  // Check if database is empty or table doesn't exist
-  const isEmpty = stats.total_invoices === 0 && stats.total_patients === 0;
+    // Previous month days
+    for (let i = firstDay - 1; i >= 0; i--) {
+      calendar.push({
+        date: daysInPrevMonth - i,
+        isCurrentMonth: false,
+        isToday: false,
+        hasCalls: false
+      });
+    }
+
+    // Current month days
+    const today = new Date();
+    const isCurrentMonth = currentMonth === today.getMonth() + 1 && currentYear === today.getFullYear();
+
+    for (let date = 1; date <= daysInMonth; date++) {
+      const dateKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+      calendar.push({
+        date,
+        isCurrentMonth: true,
+        isToday: isCurrentMonth && date === today.getDate(),
+        hasCalls: highlightedDates.has(dateKey)
+      });
+    }
+
+    // Next month days to fill the grid
+    const remainingCells = 42 - calendar.length;
+    for (let date = 1; date <= remainingCells; date++) {
+      calendar.push({
+        date,
+        isCurrentMonth: false,
+        isToday: false,
+        hasCalls: false
+      });
+    }
+
+    return calendar;
+  };
+
+  const handlePrevMonth = () => {
+    if (currentMonth === 1) {
+      setCurrentMonth(12);
+      setCurrentYear(currentYear - 1);
+    } else {
+      setCurrentMonth(currentMonth - 1);
+    }
+    setSelectedDate(null);
+    setSelectedDateCalls([]);
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 12) {
+      setCurrentMonth(1);
+      setCurrentYear(currentYear + 1);
+    } else {
+      setCurrentMonth(currentMonth + 1);
+    }
+    setSelectedDate(null);
+    setSelectedDateCalls([]);
+  };
+
+  const handleDateClick = (date: number, isCurrentMonth: boolean) => {
+    if (isCurrentMonth) {
+      setSelectedDate(date);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -129,566 +242,561 @@ export const Dashboard = () => {
     }).format(amount);
   };
 
-  // Normalize aging buckets by grouping case-insensitively and handling dash variations
-  const normalizeAgingBuckets = (buckets: Array<{ bucket: string; count: number; total_amount: number }>) => {
-    const normalizedMap = new Map<string, { bucket: string; count: number; total_amount: number; originalBucket?: string }>();
-    
-    buckets.forEach(item => {
-      // Normalize: lowercase, replace en-dash/em-dash with hyphen, trim
-      const normalizeKey = (bucket: string): string => {
-        if (!bucket) return 'unknown';
-        // Replace en-dash (U+2013) and em-dash (U+2014) with regular hyphen
-        return bucket.replace(/\u2013/g, '-').replace(/\u2014/g, '-').toLowerCase().trim();
-      };
-      
-      const normalizedKey = normalizeKey(item.bucket);
-      const existing = normalizedMap.get(normalizedKey);
-      
-      if (existing) {
-        // Merge: combine counts and amounts
-        existing.count += item.count;
-        existing.total_amount += item.total_amount;
-      } else {
-        // First occurrence: use normalized format for consistency
-        // Capitalize "Days" for better display
-        let displayName = normalizeKey(item.bucket);
-        if (displayName.includes('days')) {
-          displayName = displayName.replace('days', 'Days');
-        }
-        normalizedMap.set(normalizedKey, {
-          bucket: displayName,
-          count: item.count,
-          total_amount: item.total_amount,
-          originalBucket: item.bucket // Keep original for API calls
-        });
-      }
-    });
-    
-    return Array.from(normalizedMap.values());
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="text-sm text-foreground">Loading dashboard...</div>
+        </div>
+      </div>
+    );
+  }
 
-  // Sort aging buckets by numeric order (extract numbers from bucket names)
-  const sortAgingBuckets = (buckets: Array<{ bucket: string; count: number; total_amount: number }>) => {
-    const sorted = [...buckets];
-    
-    sorted.sort((a, b) => {
-      // Extract first number from bucket name (e.g., "0-30 Days" -> 0, "31-60 Days" -> 31)
-      const extractFirstNumber = (bucket: string): number => {
-        const match = bucket.match(/(\d+)/);
-        return match ? parseInt(match[1], 10) : 9999; // Put non-numeric buckets at the end
-      };
-      
-      const numA = extractFirstNumber(a.bucket);
-      const numB = extractFirstNumber(b.bucket);
-      
-      if (numA !== numB) {
-        return numA - numB;
-      }
-      
-      // If same starting number, sort alphabetically
-      return a.bucket.localeCompare(b.bucket);
-    });
-    
-    return sorted;
-  };
+  if (!stats) {
+    return (
+      <div className="neumorphic-inset p-6 rounded-xl">
+        <div className="text-center py-8">
+          <FiActivity className="w-12 h-12 mx-auto mb-4 text-foreground" />
+          <p className="text-foreground">Unable to load dashboard statistics</p>
+        </div>
+      </div>
+    );
+  }
 
-  // Show empty state if no data
+  const isEmpty = stats.total_invoices === 0 && stats.total_patients === 0;
+
   if (isEmpty) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
+      <div className="neumorphic-inset p-8 rounded-xl">
         <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-gray-100 mb-4">
-            <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
+          <div className="w-16 h-16 mx-auto mb-4 neumorphic-soft rounded-full flex items-center justify-center">
+            <FiFileText className="w-8 h-8 text-foreground" />
           </div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Data Available</h3>
-          <p className="text-gray-500 mb-4">
-            Upload a file (CSV, Excel, or PDF) to start tracking invoices and see analytics here.
-          </p>
-          <p className="text-sm text-gray-400">
-            Make sure your database is properly configured and tables are created.
+          <h3 className="text-lg font-semibold mb-2 text-foreground">No Data Available</h3>
+          <p className="text-foreground mb-4">
+            Upload a file to start tracking invoices and see analytics here.
           </p>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-6">
-      {/* All Stats Grid - 9 cards in 2 rows (4 in first row, 5 in second row, equally distributed) */}
-      <div 
-        className="grid gap-4"
-        style={{
-          gridTemplateColumns: 'repeat(20, 1fr)'
-        }}
+  const calendarGrid = generateCalendarGrid();
+
+  // Define metric cards configuration
+  interface MetricConfig {
+    key: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    value: number | string;
+    gradient: string;
+    border: string;
+    onClick?: () => void;
+    formatValue?: (val: number) => string;
+    badges?: Array<{ label: string; value: number; color: string }>;
+    subtitle?: string;
+    useSmallerText?: boolean;
+  }
+
+  const primaryMetrics: MetricConfig[] = [
+    {
+      key: 'totalInvoices',
+      label: 'Total Invoices',
+      icon: FiFileText,
+      value: stats.total_invoices,
+      gradient: 'from-sky-500/20 via-sky-500/10 to-transparent',
+      border: 'border-sky-500/50',
+    },
+    {
+      key: 'totalPatients',
+      label: 'Total Patients',
+      icon: FiUsers,
+      value: stats.total_patients,
+      gradient: 'from-sky-500/20 via-sky-500/10 to-transparent',
+      border: 'border-sky-500/50',
+    },
+    {
+      key: 'outstanding',
+      label: 'Outstanding',
+      icon: FiDollarSign,
+      value: stats.total_outstanding,
+      gradient: 'from-red-500/20 via-red-500/10 to-transparent',
+      border: 'border-red-500/50',
+      formatValue: formatCurrency,
+      useSmallerText: true,
+    },
+    {
+      key: 'amountPaid',
+      label: 'Amount Paid',
+      icon: FiCheckCircle,
+      value: stats.total_amount_paid || 0,
+      gradient: 'from-emerald-500/20 via-emerald-500/10 to-transparent',
+      border: 'border-emerald-500/50',
+      formatValue: formatCurrency,
+      onClick: () => setShowPaidPatientsModal(true),
+      useSmallerText: true,
+    },
+  ];
+
+  const secondaryMetrics: MetricConfig[] = [
+    {
+      key: 'callsMade',
+      label: 'Calls Made',
+      icon: FiPhone,
+      value: stats.calls_made,
+      gradient: 'from-indigo-500/20 via-indigo-500/10 to-transparent',
+      border: 'border-indigo-500/50',
+      badges: [
+        { label: 'done', value: stats.calls_completed, color: 'emerald' },
+        { label: 'pending', value: stats.calls_pending, color: 'yellow' },
+      ],
+    },
+    {
+      key: 'linksSent',
+      label: 'Links Sent',
+      icon: FiLink,
+      value: stats.links_sent,
+      gradient: 'from-purple-500/20 via-purple-500/10 to-transparent',
+      border: 'border-purple-500/50',
+      subtitle: `${stats.links_requested} requested`,
+    },
+    {
+      key: 'thisWeek',
+      label: 'This Week',
+      icon: FiActivity,
+      value: stats.recent_calls,
+      gradient: 'from-purple-500/20 via-purple-500/10 to-transparent',
+      border: 'border-purple-500/50',
+      subtitle: `${stats.recent_uploads} uploads`,
+    },
+    {
+      key: 'files',
+      label: 'Files',
+      icon: FiUpload,
+      value: stats.total_files,
+      gradient: 'from-fuchsia-500/20 via-fuchsia-500/10 to-transparent',
+      border: 'border-fuchsia-500/50',
+    },
+  ];
+
+  // Render metric card component
+  const renderMetricCard = (metric: MetricConfig) => {
+    const IconComponent = metric.icon;
+    const displayValue = metric.formatValue 
+      ? metric.formatValue(typeof metric.value === 'number' ? metric.value : 0)
+      : metric.value;
+    const textSizeClass = metric.useSmallerText 
+      ? 'text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl'
+      : 'text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl';
+
+    return (
+      <div
+        key={metric.key}
+        className={`relative overflow-hidden rounded-xl sm:rounded-2xl p-3 sm:p-4 transition-all duration-300 group ${
+          metric.onClick ? 'cursor-pointer' : ''
+        }
+          bg-gradient-to-br ${metric.gradient}
+          backdrop-blur-xl border-2 ${metric.border}
+          shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_0_25px_rgba(255,255,255,0.4)]
+          hover:scale-[1.02] glass-shine`}
+        onClick={metric.onClick}
       >
-        {/* Total Invoices */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 col-span-1 md:col-span-10 lg:col-span-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Total Invoices</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total_invoices}</p>
-            </div>
-            <div className="p-3 bg-blue-100 rounded-full">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
+        {/* Dynamic Sliding Shine Effect */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 pointer-events-none" />
+        <div className="relative space-y-1 sm:space-y-2 z-10">
+          <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-semibold !text-foreground drop-shadow-sm">
+            <IconComponent className="size-4 sm:size-5" />
+            <span className="truncate">{metric.label}</span>
           </div>
-        </div>
-
-        {/* Total Patients */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 col-span-1 md:col-span-10 lg:col-span-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Total Patients</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total_patients}</p>
-            </div>
-            <div className="p-3 bg-green-100 rounded-full">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
+          <div className={`${textSizeClass} font-bold tabular-nums !text-foreground drop-shadow-md ${metric.useSmallerText ? 'break-words' : ''}`}>
+            {displayValue}
           </div>
-        </div>
-
-        {/* Total Outstanding */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 col-span-1 md:col-span-10 lg:col-span-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Total Outstanding</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(stats.total_outstanding)}</p>
-            </div>
-            <div className="p-3 bg-red-100 rounded-full">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Total Amount Paid */}
-        <div 
-          className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 cursor-pointer hover:shadow-md transition-shadow col-span-1 md:col-span-10 lg:col-span-5"
-          onClick={() => setShowPaidPatientsModal(true)}
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Total Amount Paid</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(stats.total_amount_paid || 0)}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {stats.paid_patients && stats.paid_patients.length > 0 
-                  ? `${stats.paid_patients.length} payment${stats.paid_patients.length !== 1 ? 's' : ''} • Click to view` 
-                  : 'Click to view details'}
-              </p>
-            </div>
-            <div className="p-3 bg-emerald-100 rounded-full">
-              <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Calls Made */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 col-span-1 md:col-span-8 lg:col-span-4">
-          <p className="text-sm text-gray-500 font-medium">Calls Made</p>
-          <p className="text-2xl font-bold text-teal-600 mt-2">{stats.calls_made}</p>
-          <div className="mt-3 flex gap-2 text-xs flex-wrap">
-            <span className="px-2 py-1 bg-green-100 text-green-700 rounded">Completed: {stats.calls_completed}</span>
-            <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">Pending: {stats.calls_pending}</span>
-            <span className="px-2 py-1 bg-red-100 text-red-700 rounded">Failed: {stats.calls_failed}</span>
-          </div>
-        </div>
-
-        {/* Links Sent */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 col-span-1 md:col-span-8 lg:col-span-4">
-          <p className="text-sm text-gray-500 font-medium">Payment Links Sent</p>
-          <p className="text-2xl font-bold text-blue-600 mt-2">{stats.links_sent}</p>
-          <p className="text-xs text-gray-500 mt-2">Requested: {stats.links_requested}</p>
-        </div>
-
-        {/* With Estimated Date */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 col-span-1 md:col-span-8 lg:col-span-4">
-          <p className="text-sm text-gray-500 font-medium">With Payment Date</p>
-          <p className="text-2xl font-bold text-indigo-600 mt-2">{stats.with_estimated_date}</p>
-          <p className="text-xs text-gray-500 mt-2">Out of {stats.total_invoices} invoices</p>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 col-span-1 md:col-span-8 lg:col-span-4">
-          <p className="text-sm text-gray-500 font-medium">Recent Activity (7 days)</p>
-          <p className="text-2xl font-bold text-purple-600 mt-2">{stats.recent_calls}</p>
-          <p className="text-xs text-gray-500 mt-2">Calls | {stats.recent_uploads} new uploads</p>
-        </div>
-
-        {/* Files Uploaded */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 col-span-1 md:col-span-8 lg:col-span-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500 font-medium">Files Uploaded</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">{stats.total_files}</p>
-            </div>
-            <div className="p-3 bg-purple-100 rounded-full">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Calendar and Outstanding by Aging Bucket Side by Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Calendar Section */}
-        <CalendarView />
-
-        {/* Outstanding by Aging Bucket */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Outstanding by Aging Bucket</h3>
-          </div>
-          
-          {stats.aging_distribution.length > 0 ? (
-            <>
-              {/* Dropdown Selector */}
-              <div className="relative mb-4" ref={agingDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => setIsAgingDropdownOpen(!isAgingDropdownOpen)}
-                  className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
-                >
-                  <span>
-                    {selectedAgingBucket 
-                      ? sortAgingBuckets(normalizeAgingBuckets(stats.aging_distribution)).find(b => b.bucket === selectedAgingBucket)?.bucket || 'Select aging bucket'
-                      : 'All Aging Buckets'}
+          {metric.badges && metric.badges.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1 sm:mt-2">
+              {metric.badges.map((badge, idx) => {
+                const colorClasses = {
+                  emerald: 'bg-emerald-500/20 text-foreground border-emerald-500/30',
+                  yellow: 'bg-yellow-500/20 text-foreground border-yellow-500/30',
+                  red: 'bg-red-500/20 text-foreground border-red-500/30',
+                  blue: 'bg-blue-500/20 text-foreground border-blue-500/30',
+                };
+                return (
+                  <span
+                    key={idx}
+                    className={`text-[9px] sm:text-[10px] md:text-xs px-1 sm:px-1.5 py-0.5 rounded backdrop-blur-sm border ${colorClasses[badge.color as keyof typeof colorClasses] || colorClasses.emerald}`}
+                  >
+                    {badge.value} {badge.label}
                   </span>
-                  <FiChevronDown 
-                    className={`ml-2 h-5 w-5 text-gray-500 flex-shrink-0 transition-transform duration-200 ${
-                      isAgingDropdownOpen ? 'transform rotate-180' : ''
-                    }`}
-                  />
-                </button>
-
-                {isAgingDropdownOpen && (
-                  <div className="absolute z-50 mt-2 w-full bg-white rounded-lg shadow-xl border border-gray-200 py-2 max-h-64 overflow-y-auto">
-                    {/* All option */}
-                    <button
-                      onClick={() => {
-                        setSelectedAgingBucket(null);
-                        setIsAgingDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
-                        selectedAgingBucket === null
-                          ? 'bg-teal-50 text-teal-700 font-semibold'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span>All Aging Buckets</span>
-                      {selectedAgingBucket === null && (
-                        <FiCheck className="h-5 w-5 text-teal-600" />
-                      )}
-                    </button>
-                    
-                    {/* Individual bucket options */}
-                    {sortAgingBuckets(normalizeAgingBuckets(stats.aging_distribution)).map((item, index) => {
-                      // Use the bucket name as-is for API call (backend will normalize it)
-                      const bucketForApi = item.bucket;
-                      
-                      return (
-                        <button
-                          key={index}
-                          onClick={async () => {
-                            setSelectedAgingBucket(item.bucket);
-                            setIsAgingDropdownOpen(false);
-                            // Fetch and show invoices for this bucket
-                            setLoadingAgingPatients(true);
-                            setShowAgingBucketModal(true);
-                            try {
-                              console.log('Fetching patients for aging bucket:', bucketForApi);
-                              const result = await getPatientsByAgingBucket(bucketForApi);
-                              console.log('Received patients:', result);
-                              setAgingBucketPatients(result.patients || []);
-                            } catch (error) {
-                              console.error('Failed to load patients by aging bucket:', error);
-                              setAgingBucketPatients([]);
-                            } finally {
-                              setLoadingAgingPatients(false);
-                            }
-                          }}
-                          className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
-                            selectedAgingBucket === item.bucket
-                              ? 'bg-teal-50 text-teal-700 font-semibold'
-                              : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span>{item.bucket} ({item.count} invoices - {formatCurrency(item.total_amount)})</span>
-                          {selectedAgingBucket === item.bucket && (
-                            <FiCheck className="h-5 w-5 text-teal-600" />
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Display selected bucket or all buckets */}
-              <div className="space-y-3">
-                {selectedAgingBucket ? (
-                  // Show only selected bucket
-                  (() => {
-                    const selectedItem = sortAgingBuckets(normalizeAgingBuckets(stats.aging_distribution)).find(
-                      item => item.bucket === selectedAgingBucket
-                    );
-                    return selectedItem ? (
-                      <div className="flex items-center justify-between p-4 bg-teal-50 rounded-lg border border-teal-200">
-                        <span className="text-sm font-semibold text-gray-900">{selectedItem.bucket}</span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-gray-600">{selectedItem.count} invoices</span>
-                          <span className="text-lg font-bold text-teal-700">{formatCurrency(selectedItem.total_amount)}</span>
-                        </div>
-                      </div>
-                    ) : null;
-                  })()
-                ) : (
-                  // Show all buckets (sorted)
-                  sortAgingBuckets(normalizeAgingBuckets(stats.aging_distribution)).map((item, index) => (
-                    <div key={index} className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">{item.bucket}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-500">{item.count} invoices</span>
-                        <span className="text-sm font-semibold text-gray-900">{formatCurrency(item.total_amount)}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-gray-500 text-center py-4">No data available</p>
+                );
+              })}
+            </div>
+          )}
+          {metric.subtitle && (
+            <p className="text-[10px] sm:text-xs text-foreground/70 mt-1 sm:mt-2">{metric.subtitle}</p>
           )}
         </div>
       </div>
+    );
+  };
 
-      {/* Recent Calls Section - Below Calendar */}
-      {stats.recent_calls_list && stats.recent_calls_list.length > 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Calls</h3>
-          <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-            {stats.recent_calls_list.map((call, index) => {
-              // Filter out "value_or_empty" - only show invoice if it has a valid value
-              const invoiceNumber = call.invoice_number && call.invoice_number !== 'value_or_empty' && call.invoice_number.trim() !== ''
-                ? call.invoice_number 
-                : null;
-              
-              return (
-                <div key={index} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{`${call.patient_first_name || ''} ${call.patient_last_name || ''}`.trim() || 'Unknown'}</p>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
-                        call.call_status === 'completed' 
-                          ? 'bg-green-100 text-green-800' 
-                          : call.call_status === 'failed'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {call.call_status}
-                      </span>
-                    </div>
-                    {invoiceNumber && (
-                    <p className="text-xs text-gray-600 mb-1 truncate">Invoice: {invoiceNumber}</p>
-                    )}
-                    <p className="text-xs text-gray-600 mb-1 truncate">Phone: {call.phone_number}</p>
-                    {call.notes && (
-                      <p className="text-xs text-gray-500 italic mt-1 whitespace-pre-wrap break-words">{call.notes}</p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-1">{formatDateTime(call.called_at)}</p>
+  return (
+    <div className="space-y-3 sm:space-y-4 md:space-y-6 px-2 sm:px-4 md:px-0">
+      {/* Primary Stats Row - Glass Cards */}
+      <div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          {primaryMetrics.map(renderMetricCard)}
+        </div>
+      </div>
+
+      {/* Secondary Stats Row - Glass Cards */}
+      <div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          {secondaryMetrics.map(renderMetricCard)}
+        </div>
+      </div>
+
+      {/* Invoice Calls Section - Table on LEFT, Calendar on RIGHT (like appointment-page.tsx) */}
+      <div>
+        <div className="mb-2 sm:mb-3">
+          <h1 className="text-base sm:text-lg md:text-xl font-semibold text-foreground">
+            Invoice Calls ({selectedDateCalls.length || 0})
+          </h1>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4">
+          {/* Calls Table - LEFT side (order-2 on mobile, order-1 on desktop) */}
+          <div className="order-2 md:order-1 col-span-12 md:col-span-7 lg:col-span-8 flex flex-col">
+            {selectedDate ? (
+              <div className="flex-1 flex flex-col" key={selectedDate}>
+                {loadingCalls ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
                   </div>
+                ) : selectedDateCalls.length > 0 ? (
+                  <div className="relative bg-gradient-to-br from-[#9a8ea2]/80 to-[#b0a4b2]/60 backdrop-blur-xl rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-4 border-[2px] sm:border-[3px] border-[#e8a855]/70 shadow-[0_0_30px_rgba(232,168,85,0.5),0_0_60px_rgba(232,168,85,0.2),0_8px_32px_rgba(150,130,160,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] flex flex-col overflow-hidden glass-shine">
+                    {/* Glossy Top Highlight */}
+                    <div className="absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-white/25 via-white/10 to-transparent rounded-t-lg sm:rounded-t-xl pointer-events-none" />
+
+                    <div className="overflow-hidden rounded-lg sm:rounded-xl flex-1 flex flex-col relative z-10">
+                      {/* Fixed Header Table */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs sm:text-sm table-fixed min-w-[400px]">
+                          <colgroup>
+                            <col className="w-[20%] md:w-[15%]" />
+                            <col className="w-[50%] md:w-[30%]" />
+                            <col className="w-[0%] md:w-[25%]" />
+                            <col className="w-[30%] md:w-[30%]" />
+                          </colgroup>
+                          <thead className="bg-[#9a8ea2]">
+                            <tr>
+                              <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base">Time</th>
+                              <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base">Patient</th>
+                              <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base hidden md:table-cell">Invoice</th>
+                              <th className="text-right font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base">Outstanding</th>
+                            </tr>
+                          </thead>
+                        </table>
+                      </div>
+
+                      {/* Scrollable Body Container */}
+                      <div className="overflow-x-auto max-h-[200px] sm:max-h-[280px] md:max-h-[320px] overflow-y-auto flex-1 bg-white/80 rounded-lg">
+                        <table className="w-full text-xs sm:text-sm table-fixed min-w-[400px]">
+                          <colgroup>
+                            <col className="w-[20%] md:w-[15%]" />
+                            <col className="w-[50%] md:w-[30%]" />
+                            <col className="w-[0%] md:w-[25%]" />
+                            <col className="w-[30%] md:w-[30%]" />
+                          </colgroup>
+                          <tbody className="divide-y divide-[#9a8ea2]/30">
+                            {selectedDateCalls.map((call, index) => (
+                              <tr key={index} className="bg-transparent hover:bg-white/10 transition-colors cursor-pointer">
+                                <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4">
+                                  <div className="flex items-center gap-1 md:gap-2">
+                                    <span className="text-xs sm:text-sm md:text-base text-foreground whitespace-nowrap">
+                                      {formatTime(call.called_at)}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4">
+                                  <span className="text-xs sm:text-sm md:text-base font-semibold text-foreground break-words">
+                                    {`${call.patient_first_name || ''} ${call.patient_last_name || ''}`.trim() || 'Unknown'}
+                                  </span>
+                                </td>
+                                <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 hidden md:table-cell">
+                                  <span className="text-sm md:text-base text-foreground truncate block">
+                                    {call.invoice_number && call.invoice_number !== 'value_or_empty'
+                                      ? call.invoice_number
+                                      : '-'}
+                                  </span>
+                                </td>
+                                <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-right">
+                                  <span className="text-xs sm:text-sm md:text-base font-semibold text-foreground">
+                                    {formatCurrency(call.outstanding_amount)}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="liquid-glass rounded-xl p-8 border-0 flex flex-col items-center justify-center text-center">
+                    <div className="text-foreground">
+                      <FiCalendar className="w-12 h-12 mb-4" />
+                    </div>
+                    <h3 className="text-lg font-medium text-foreground mb-2">
+                      No Calls Scheduled
+                    </h3>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col">
+                <div className="liquid-glass rounded-xl p-8 border-0 flex flex-col items-center justify-center text-center">
+                  <div>
+                    <FiCalendar className="w-16 h-16 mb-4" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-foreground mb-2">
+                    Select a Date
+                  </h3>
+                  <p className="text-sm">
+                    Choose a date from the calendar to view and manage invoice calls for that day.
+                  </p>
                 </div>
-              );
-            })}
+              </div>
+            )}
+          </div>
+
+          {/* Calendar Component */}
+          <div className="order-1 md:order-2 col-span-12 md:col-span-5 lg:col-span-4 w-full max-w-full sm:max-w-md md:max-w-none mx-auto md:mx-0">
+            {/* Calendar Content */}
+            <div className="relative p-2 sm:p-3 md:p-4 items-center justify-center bg-gradient-to-br from-[#d7d7f3]/80 to-[#e5e5f8]/60 backdrop-blur-xl rounded-lg sm:rounded-xl border-2 border-[#b8a0d4]/50 shadow-[0_0_20px_rgba(184,160,212,0.3),0_8px_32px_rgba(200,200,240,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] overflow-hidden w-full min-h-[280px] sm:min-h-[300px] md:min-h-[320px] flex flex-col glass-shine">
+              {/* Glossy Top Highlight */}
+              <div className="absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-white/30 via-white/10 to-transparent rounded-t-xl pointer-events-none" />
+              <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 px-2 sm:px-4 md:px-6 w-full justify-center">
+                <div>
+                  <Button
+                    onClick={handlePrevMonth}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9 p-0 bg-white/50 border-gray-300 hover:bg-white/80"
+                  >
+                    <FiChevronLeft className="w-3 h-3 sm:w-4 sm:h-4 text-foreground" />
+                  </Button>
+                </div>
+                <h1
+                  key={`${currentMonth}-${currentYear}`}
+                  className="text-sm sm:text-base md:text-lg font-semibold flex-1 text-center text-foreground px-2"
+                >
+                  {months[currentMonth - 1]} {currentYear}
+                </h1>
+                <div>
+                  <Button
+                    onClick={handleNextMonth}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9 p-0 bg-white/50 border-gray-300 hover:bg-white/80"
+                  >
+                    <FiChevronRight className="w-3 h-3 sm:w-4 sm:h-4 text-foreground" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 flex flex-col w-full">
+                {/* Day Headers */}
+                <div className="grid grid-cols-7 gap-1 sm:gap-1.5 md:gap-2 px-1 sm:px-2 md:px-3 w-full">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <div
+                      key={day}
+                      className="text-center text-[9px] sm:text-[10px] md:text-xs lg:text-[12px] font-medium text-foreground px-0.5 py-1 sm:py-1.5 rounded min-w-0"
+                    >
+                      <span className="hidden sm:inline">{day}</span>
+                      <span className="sm:hidden">{day.charAt(0)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar Grid */}
+                <div
+                  key={`${currentMonth}-${currentYear}`}
+                  className="grid grid-cols-7 gap-1 sm:gap-1.5 md:gap-2 p-1 sm:p-2 md:p-3 flex-1 w-full auto-rows-fr"
+                >
+                  {calendarGrid.map((day, index) => {
+                    return (
+                      <div
+                        key={index}
+                        onClick={() => day.isCurrentMonth ? handleDateClick(day.date, day.isCurrentMonth) : undefined}
+                        className={`
+                          calendar-cell relative rounded-lg cursor-pointer
+                          w-full min-h-0 flex flex-col justify-center items-center transition-all duration-300
+                          ${day.isCurrentMonth
+                            ? selectedDate === day.date
+                              ? 'bg-[#5a8ac7] text-foreground shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] ring-2 ring-[#5a8ac7] z-10'
+                              : day.isToday
+                                ? 'bg-white ring-2 ring-[#5a8ac7] text-foreground'
+                                : day.hasCalls
+                                  ? 'bg-white hover:scale-105 text-foreground shadow-sm'
+                                  : 'bg-white/90 hover:bg-white text-foreground'
+                            : 'bg-white/40 opacity-40 cursor-not-allowed text-foreground'
+                          }
+                        `}
+                        style={{ aspectRatio: '1' }}
+                      >
+                        <div
+                          className={`
+                            font-semibold text-center leading-tight transition-all duration-300
+                            ${day.isCurrentMonth && selectedDate === day.date 
+                              ? 'text-foreground text-sm sm:text-base md:text-lg' 
+                              : 'text-foreground text-xs sm:text-sm md:text-base'}
+                          `}
+                        >
+                          {day.date}
+                        </div>
+
+                        {/* Show call count badge */}
+                        {day.hasCalls && day.isCurrentMonth && (
+                          <div className="-mt-0.5 sm:-mt-1">
+                            <div
+                              className={`appointment-badge inline-flex items-center justify-center text-[7px] sm:text-[8px] md:text-[9px] lg:text-[10px] font-medium rounded-full px-0.5 sm:px-1 ${selectedDate === day.date
+                                ? 'bg-white/40 text-foreground border border-white/50'
+                                : 'bg-[#5a8ac7]/20 text-foreground border border-[#5a8ac7]/40'
+                                }`}
+                            >
+                              1
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Calls Section - Same style as Invoice Calls Calendar table */}
+      {stats.recent_calls_list && stats.recent_calls_list.length > 0 && (
+        <div className="space-y-2 sm:space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-foreground">Recent Calls History</h3>
+            <span className="text-xs sm:text-sm text-foreground">
+              {stats.recent_calls_list.length} call{stats.recent_calls_list.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+
+          <div className="relative bg-gradient-to-br from-[#9a8ea2]/80 to-[#b0a4b2]/60 backdrop-blur-xl rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-4 border-[2px] sm:border-[3px] border-[#e8a855]/70 shadow-[0_0_30px_rgba(232,168,85,0.5),0_0_60px_rgba(232,168,85,0.2),0_8px_32px_rgba(150,130,160,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] flex flex-col overflow-hidden glass-shine">
+            {/* Glossy Top Highlight */}
+            <div className="absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-white/25 via-white/10 to-transparent rounded-t-lg sm:rounded-t-xl pointer-events-none" />
+
+            <div className="overflow-hidden rounded-lg sm:rounded-xl flex-1 flex flex-col relative z-10">
+              {/* Fixed Header Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs sm:text-sm table-fixed min-w-[500px]">
+                  <colgroup>
+                    <col className="w-[40%] md:w-[30%]" />
+                    <col className="w-[30%] md:w-[25%]" />
+                    <col className="w-[0%] md:w-[25%]" />
+                    <col className="w-[30%] md:w-[20%]" />
+                  </colgroup>
+                  <thead className="bg-[#9a8ea2]">
+                    <tr>
+                      <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base">Patient</th>
+                      <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base">Phone</th>
+                      <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base hidden md:table-cell">Called At</th>
+                      <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base">Status</th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+
+              {/* Scrollable Body Container */}
+              <div className="overflow-x-auto max-h-[200px] sm:max-h-[300px] md:max-h-[50vh] overflow-y-auto flex-1 bg-white/80 rounded-lg">
+                <table className="w-full text-xs sm:text-sm table-fixed min-w-[500px]">
+                  <colgroup>
+                    <col className="w-[40%] md:w-[30%]" />
+                    <col className="w-[30%] md:w-[25%]" />
+                    <col className="w-[0%] md:w-[25%]" />
+                    <col className="w-[30%] md:w-[20%]" />
+                  </colgroup>
+                  <tbody className="divide-y divide-[#9a8ea2]/30">
+                    {stats.recent_calls_list.map((call, index) => (
+                      <tr key={index} className="bg-transparent hover:bg-white/10 transition-all duration-200">
+                        <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4">
+                          <span className="text-xs sm:text-sm md:text-base font-semibold text-foreground break-words">
+                            {`${call.patient_first_name || ''} ${call.patient_last_name || ''}`.trim() || 'Unknown'}
+                          </span>
+                        </td>
+                        <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4">
+                          <span className="text-xs sm:text-sm md:text-base text-foreground break-all">{call.phone_number}</span>
+                        </td>
+                        <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 hidden md:table-cell">
+                          <span className="text-xs sm:text-sm md:text-base text-foreground">{formatDateTime(call.called_at)}</span>
+                        </td>
+                        <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4">
+                          <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs md:text-sm font-bold border text-foreground ${call.call_status === 'completed'
+                            ? 'bg-green-500/20 border-green-500/50'
+                            : call.call_status === 'failed'
+                              ? 'bg-red-500/20 border-red-500/50'
+                              : 'bg-yellow-500/20 border-yellow-500/50'
+                            }`}>
+                            {call.call_status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {/* Paid Patients Modal */}
       {showPaidPatientsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowPaidPatientsModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">Paid Patients</h2>
-              <button
-                onClick={() => setShowPaidPatientsModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4" onClick={() => setShowPaidPatientsModal(false)}>
+          <div className="neumorphic-card max-w-full sm:max-w-2xl w-full max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col rounded-lg sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border flex items-center justify-between">
+              <h2 className="text-base sm:text-lg font-semibold text-foreground">Paid Patients</h2>
+              <button onClick={() => setShowPaidPatientsModal(false)} className="p-1.5 sm:p-2 neumorphic-button-plain rounded-lg">
+                <FiX className="w-4 h-4 sm:w-5 sm:h-5 text-foreground" />
               </button>
             </div>
-            <div className="px-6 py-4 overflow-y-auto flex-1">
+            <div className="flex-1 overflow-y-auto p-3 sm:p-4">
               {stats.paid_patients && stats.paid_patients.length > 0 ? (
-                <div className="space-y-3">
-                  {stats.paid_patients.map((patient, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-gray-900">{`${patient.patient_first_name || ''} ${patient.patient_last_name || ''}`.trim() || 'Unknown'}</p>
-                        <p className="text-xs text-gray-600 mt-1">Invoice: {patient.invoice_number}</p>
-                        {patient.phone_number && (
-                          <p className="text-xs text-gray-600 mt-1">Phone: {patient.phone_number}</p>
-                        )}
+                <div className="space-y-2 sm:space-y-3">
+                  {stats.paid_patients.map((patient, i) => (
+                    <div key={i} className="p-3 sm:p-4 neumorphic-soft rounded-lg sm:rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm sm:text-base text-foreground break-words">{`${patient.patient_first_name || ''} ${patient.patient_last_name || ''}`.trim() || 'Unknown'}</p>
+                        <p className="text-xs sm:text-sm text-foreground break-words">Invoice: {patient.invoice_number}</p>
                         {patient.payment_completed_at && (
-                          <p className="text-xs text-gray-500 mt-1">Paid on: {formatDateTime(patient.payment_completed_at)}</p>
+                          <p className="text-[10px] sm:text-xs text-foreground">{formatDateTime(patient.payment_completed_at)}</p>
                         )}
                       </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-emerald-700">{formatCurrency(patient.amount_paid)}</p>
-                      </div>
+                      <div className="text-base sm:text-lg font-bold text-foreground whitespace-nowrap">{formatCurrency(patient.amount_paid)}</div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-gray-100 mb-4">
-                    <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <p className="text-gray-500 text-lg font-medium mb-2">No paid patients yet</p>
-                  <p className="text-gray-400 text-sm">Payments will appear here once patients complete their payments</p>
+                <div className="text-center py-8 sm:py-12">
+                  <FiCheckCircle className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 text-foreground" />
+                  <p className="text-sm sm:text-base text-foreground">No paid patients yet</p>
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <div className="flex flex-col">
-                  <p className="text-sm text-gray-600">
-                    Total Records: <span className="font-semibold text-gray-900">{stats.paid_patients?.length || 0} payment{stats.paid_patients?.length !== 1 ? 's' : ''}</span>
-                  </p>
-                  {stats.paid_patients && stats.paid_patients.length > 0 && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Unique Patients: <span className="font-semibold text-gray-700">
-                        {(() => {
-                          const paidPatients = stats.paid_patients as DashboardStats['paid_patients'];
-                          return new Set(paidPatients.map((p) => {
-                            const fullName = `${p.patient_first_name || ''} ${p.patient_last_name || ''}`.trim() || 'Unknown';
-                            return `${fullName}-${p.invoice_number}`;
-                          })).size;
-                        })()}
-                      </span>
-                    </p>
-                  )}
-                </div>
-                <p className="text-sm text-gray-600">
-                  Total Amount: <span className="font-semibold text-emerald-700">{formatCurrency(stats.total_amount_paid || 0)}</span>
-                </p>
-              </div>
+            <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-t border-border neumorphic-pressed flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm">
+              <span className="text-foreground">{stats.paid_patients?.length || 0} payments</span>
+              <span className="font-bold text-foreground">{formatCurrency(stats.total_amount_paid || 0)}</span>
             </div>
           </div>
         </div>
       )}
 
-      {/* Aging Bucket Invoices Modal */}
-      {showAgingBucketModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowAgingBucketModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Invoices - {selectedAgingBucket || 'Aging Bucket'}
-              </h2>
-              <button
-                onClick={() => setShowAgingBucketModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <FiX className="w-6 h-6" />
-              </button>
-            </div>
-            <div className="px-6 py-4 overflow-y-auto flex-1">
-              {loadingAgingPatients ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
-                </div>
-              ) : agingBucketPatients.length > 0 ? (
-                <div className="space-y-3">
-                  {[...agingBucketPatients]
-                    .sort((a, b) => {
-                      const amountA = parseFloat(a.outstanding_amount || '0');
-                      const amountB = parseFloat(b.outstanding_amount || '0');
-                      return amountB - amountA; // Sort highest to lowest
-                    })
-                    .map((patient, index) => {
-                    // Helper function to clean MISSING values and format display
-                    const cleanValue = (value: string | undefined): string => {
-                      if (!value) return '';
-                      const val = String(value);
-                      if (val.startsWith('MISSING_') || val.toLowerCase() === 'nan') return '';
-                      return val;
-                    };
-                    
-                    const firstName = cleanValue(patient.patient_first_name);
-                    const lastName = cleanValue(patient.patient_last_name);
-                    const fullName = `${firstName} ${lastName}`.trim() || 'Unknown Patient';
-                    const invoiceNum = cleanValue(patient.invoice_number) || 'N/A';
-                    const phoneNum = cleanValue(patient.phone_number);
-                    const dob = cleanValue(patient.patient_dob);
-                    
-                    return (
-                      <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-900 truncate">
-                            {fullName}
-                          </p>
-                          <p className="text-xs text-gray-600 mt-1">Invoice: {invoiceNum}</p>
-                          {dob && (
-                            <p className="text-xs text-gray-600 mt-1">DOB: {dob}</p>
-                          )}
-                          {phoneNum && (
-                            <p className="text-xs text-gray-600 mt-1">Phone: {phoneNum}</p>
-                          )}
-                          {patient.invoice_date && (
-                            <p className="text-xs text-gray-500 mt-1">Date: {patient.invoice_date}</p>
-                          )}
-                        </div>
-                        <div className="text-right ml-4">
-                          <p className="text-lg font-bold text-red-600">{formatCurrency(parseFloat(patient.outstanding_amount || '0'))}</p>
-                          <p className="text-xs text-gray-500 mt-1">Outstanding</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-gray-100 mb-4">
-                    <svg className="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <p className="text-gray-500 text-lg font-medium mb-2">No invoices found</p>
-                  <p className="text-gray-400 text-sm">No invoices found for this aging bucket</p>
-                </div>
-              )}
-            </div>
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-600">
-                  Total Invoices: <span className="font-semibold text-gray-900">{agingBucketPatients.length}</span>
-                </p>
-                <p className="text-sm text-gray-600">
-                  Total Outstanding: <span className="font-semibold text-red-700">
-                    {formatCurrency(
-                      agingBucketPatients.reduce((sum, p) => sum + parseFloat(p.outstanding_amount || '0'), 0)
-                    )}
-                  </span>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

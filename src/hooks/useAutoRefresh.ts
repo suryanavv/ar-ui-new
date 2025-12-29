@@ -1,7 +1,7 @@
 import { useRef, useEffect } from 'react';
 
 interface UseAutoRefreshOptions {
-  activeSection: 'dashboard' | 'upload' | 'invoice-list' | 'users' | 'patients';
+  activeSection: 'dashboard' | 'ar-operations' | 'invoice-list' | 'users' | 'patients';
   callingInProgress: boolean;
   setCallingInProgress: (value: boolean) => void;
   setActiveCalls: React.Dispatch<React.SetStateAction<Map<string, { timestamp: number; conversationId?: string; callSid?: string; twilioStatus?: string }>>>;
@@ -48,7 +48,7 @@ export const useAutoRefresh = (options: UseAutoRefreshOptions) => {
         return;
       }
 
-      if (activeSection === 'upload') {
+      if (activeSection === 'ar-operations') {
         // Refresh patient data periodically - call_status is included in patient data
               const currentUploadId = getSelectedUploadId();
               await loadPatientData(currentUploadId, true);
@@ -95,7 +95,7 @@ export const useAutoRefresh = (options: UseAutoRefreshOptions) => {
     
     refreshIntervalRef.current = window.setInterval(checkAndRefresh, refreshInterval);
     
-    if (activeSection === 'upload') {
+    if (activeSection === 'ar-operations') {
       const currentUploadId = getSelectedUploadId();
       loadPatientData(currentUploadId, true);
     }

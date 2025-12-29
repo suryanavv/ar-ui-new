@@ -1,8 +1,12 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
-import { FileUpload, FileSelectorDropdown, BatchCallButton, DownloadButton, PatientTable, ConfirmModal } from './';
+import { useState, useMemo, useRef } from 'react';
+import { FileSelectorDropdown, PatientTable, ConfirmModal } from './';
+import { Button } from './ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import type { Patient } from '../types';
-import { FiSearch, FiX, FiChevronDown, FiCheck, FiDownload, FiPhone } from 'react-icons/fi';
+import { FiDownload, FiPhone, FiUpload } from 'react-icons/fi';
+import { IconFilter } from '@tabler/icons-react';
 import { exportARTestingCSV, updatePatient, exportSelectedPatients } from '../services/api';
+import api from '../services/api';
 
 interface FileOption {
   id: number;
@@ -57,14 +61,37 @@ export const UploadSection = ({
 }: UploadSectionProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [callStatusFilter, setCallStatusFilter] = useState<CallStatusFilter>('all');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showBatchCallModal, setShowBatchCallModal] = useState(false);
   const [selectedPatientIds, setSelectedPatientIds] = useState<Set<number>>(new Set());
   const [showSelectedCallModal, setShowSelectedCallModal] = useState(false);
   const [downloadingARTesting, setDownloadingARTesting] = useState(false);
   const [downloadingSelected, setDownloadingSelected] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // File upload handlers
+  const validateFile = (file: File): boolean => {
+    const validExtensions = ['.csv', '.xlsx', '.xls', '.pdf'];
+    const isValid = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
+    if (!isValid) {
+      alert('Please select a CSV, XLSX, XLS, or PDF file');
+      return false;
+    }
+    return true;
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (validateFile(file)) {
+        // Auto-upload immediately on file selection
+        onFileUpload(file);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      } else if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   // Export AR Testing format CSV
   // Handle patient update
@@ -84,18 +111,18 @@ export const UploadSection = ({
   // Handle export selected patients
   const handleExportSelected = async () => {
     if (filteredPatients.length === 0 || downloadingSelected) return;
-    
+
     try {
       setDownloadingSelected(true);
       const invoiceIds = filteredPatients
         .filter(p => p.id)
         .map(p => p.id!);
-      
+
       if (invoiceIds.length === 0) {
         alert('No patients selected to export');
         return;
       }
-      
+
       const blob = await exportSelectedPatients(invoiceIds);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -115,21 +142,21 @@ export const UploadSection = ({
 
   const handleExportARTesting = async () => {
     if (downloadingARTesting) return;
-    
+
     try {
       setDownloadingARTesting(true);
-      const filename = selectedUploadId 
+      const filename = selectedUploadId
         ? (() => {
-            const selectedUpload = availableFiles.find(f => f.id === selectedUploadId);
-            return selectedUpload?.filename || currentFile;
-          })()
+          const selectedUpload = availableFiles.find(f => f.id === selectedUploadId);
+          return selectedUpload?.filename || currentFile;
+        })()
         : currentFile;
-      
+
       const blob = await exportARTestingCSV(filename, selectedUploadId || undefined);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      
+
       const downloadFilename = filename.replace('.csv', '') + '_AR_Testing.csv';
       link.setAttribute('download', downloadFilename);
       document.body.appendChild(link);
@@ -144,30 +171,6 @@ export const UploadSection = ({
     }
   };
 
-  // Handle click outside to close dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (
-        dropdownRef.current?.contains(target) ||
-        buttonRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setIsDropdownOpen(false);
-    };
-
-    if (isDropdownOpen) {
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('click', handleClickOutside, true);
-      }, 0);
-      
-      return () => {
-        clearTimeout(timeoutId);
-        document.removeEventListener('click', handleClickOutside, true);
-      };
-    }
-  }, [isDropdownOpen]);
 
   // Filter and search patients
   const filteredPatients = useMemo(() => {
@@ -187,7 +190,7 @@ export const UploadSection = ({
     if (callStatusFilter !== 'all') {
       filtered = filtered.filter(patient => {
         const status = (patient.call_status || '').toLowerCase();
-        
+
         if (callStatusFilter === 'pending') {
           return !status || status === 'pending' || status === '';
         } else if (callStatusFilter === 'sent') {
@@ -214,7 +217,7 @@ export const UploadSection = ({
 
     patients.forEach(patient => {
       const status = (patient.call_status || '').toLowerCase();
-      
+
       if (!status || status === 'pending' || status === '') {
         counts.pending++;
       } else if (status === 'initiated' || status === 'in_progress' || status === 'sent') {
@@ -234,284 +237,139 @@ export const UploadSection = ({
     { value: 'completed', label: 'Completed calls', count: filterCounts.completed }
   ];
 
-  const selectedFilterOption = filterOptions.find(opt => opt.value === callStatusFilter);
-
   return (
-    <div className="space-y-6">
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Left Section: Upload File */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Upload Invoice File</h2>
-          <FileUpload onUpload={onFileUpload} loading={uploadLoading} />
+    <div className="space-y-4">
+      {/* Combined View Patients Section */}
+      <div className="liquid-glass-table p-4 space-y-4 overflow-visible">
+
+        {/* Header Section */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-foreground">Manage and export patient data</h3>
+          </div>
+          <label
+            className={`relative overflow-hidden rounded-xl px-4 py-2 text-sm font-semibold inline-flex items-center gap-2 transition-all duration-300 group
+              bg-gradient-to-br from-primary/80 to-[#26C6C0]/80 backdrop-blur-xl border border-white/30
+              shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_0_25px_rgba(14,165,163,0.4)]
+              hover:scale-[1.02] text-white ${uploadLoading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+          >
+            {/* Sliding Shine Effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 pointer-events-none" />
+            <FiUpload size={16} className="relative z-10" />
+            <span className="relative z-10">{uploadLoading ? 'Uploading...' : 'Upload New File'}</span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.xlsx,.xls,.pdf"
+              onChange={handleFileChange}
+              disabled={uploadLoading}
+              className="hidden"
+            />
+          </label>
         </div>
 
-        {/* Right Section: Patient Display Controls */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">View Patients</h2>
-          
-          {/* File Selector */}
-          <div className="mb-4">
-            <label className="block text-xs text-gray-500 font-semibold uppercase tracking-wide mb-2">
-              Select File
-            </label>
-            <FileSelectorDropdown
-              options={availableFiles}
-              selectedUploadId={selectedUploadId}
-              onSelect={onFileSelect}
-            />
+
+        {/* File Selection Section */}
+        <div className="space-y-2 -mt-2 relative z-50 overflow-visible">
+          <label className="block text-sm text-foreground font-semibold tracking-wide">
+            Selected File
+          </label>
+          <FileSelectorDropdown
+            options={availableFiles}
+            selectedUploadId={selectedUploadId}
+            onSelect={onFileSelect}
+          />
+        </div>
+
+
+        {/* Batch Call Progress Bar */}
+        {batchCallProgress && batchCallProgress.total > 0 && (
+          <div className="liquid-glass-subtle p-3 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-primary">
+                Batch Call Progress
+              </span>
+              <span className="text-sm font-medium text-foreground">
+                {batchCallProgress.completed} / {batchCallProgress.total} completed
+              </span>
+            </div>
+            <div className="w-full bg-white/20 rounded-full h-2.5 overflow-hidden border border-white/30">
+              <div
+                className="bg-gradient-to-r from-primary to-[#26C6C0] h-full rounded-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(14,165,163,0.5)]"
+                style={{
+                  width: `${Math.min(100, (batchCallProgress.completed / batchCallProgress.total) * 100)}%`
+                }}
+              />
+            </div>
+            <div className="mt-2 text-xs text-muted-foreground">
+              {batchCallProgress.completed === batchCallProgress.total
+                ? 'All calls completed!'
+                : `Processing ${batchCallProgress.total - batchCallProgress.completed} remaining call${batchCallProgress.total - batchCallProgress.completed !== 1 ? 's' : ''}...`}
+            </div>
+          </div>
+        )}
+
+        {/* All Patients Section */}
+        <div className="space-y-4 pt-2 border-t border-white/20">
+
+          {/* Title */}
+          {/* <div>
+            <h3 className="text-lg font-bold text-foreground">
+              All Patients {selectedUploadId ? `(${availableFiles.find(f => f.id === selectedUploadId)?.displayName || 'Selected File'})` : '(All Files)'}
+            </h3>
+          </div> */}
+
+          {/* Search and Filter Controls */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+            {/* Search Input */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <input
+                type="text"
+                placeholder="Search by patient name or phone..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm liquid-glass-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+            </div>
+
+            {/* Filter Dropdown */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <IconFilter className="w-4 h-4 flex-shrink-0" />
+              <span className="text-sm font-medium whitespace-nowrap hidden sm:inline">Filter by:</span>
+              <Select value={callStatusFilter} onValueChange={(value) => setCallStatusFilter(value as CallStatusFilter)}>
+                <SelectTrigger className="w-48 liquid-glass-input border-white/30">
+                  <SelectValue placeholder="Select filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filterOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label} ({option.count})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Patient Count & Actions */}
-          <div className="space-y-3">
-            <div className="px-4 py-3 bg-gray-50 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide">Patients</p>
-                  <p className="text-sm text-gray-900 font-medium mt-0.5">
-                    {selectedUploadId 
-                      ? (() => {
-                          const selectedUpload = availableFiles.find(f => f.id === selectedUploadId);
-                          return selectedUpload ? `From: ${selectedUpload.displayName}` : 'All Files';
-                        })()
-                      : 'All Files'}
-                  </p>
-                </div>
-                <span className="px-3 py-1 bg-gray-600 text-white text-xs font-semibold rounded-full">
-                  {loading ? (
-                    <span className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Loading...
-                    </span>
-                  ) : (
-                    `${patients.length} patients`
-                  )}
-                </span>
-              </div>
-            </div>
-            
-            {/* Batch Call Progress Bar */}
-            {batchCallProgress && batchCallProgress.total > 0 && (
-              <div className="mb-3 p-4 bg-teal-50 border border-teal-200 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-semibold text-teal-900">
-                    Batch Call Progress
-                  </span>
-                  <span className="text-sm font-medium text-teal-700">
-                    {batchCallProgress.completed} / {batchCallProgress.total} completed
-                  </span>
-                </div>
-                <div className="w-full bg-teal-200 rounded-full h-3 overflow-hidden">
-                  <div
-                    className="bg-teal-600 h-full rounded-full transition-all duration-500 ease-out"
-                    style={{
-                      width: `${Math.min(100, (batchCallProgress.completed / batchCallProgress.total) * 100)}%`
-                    }}
-                  />
-                </div>
-                <div className="mt-2 text-xs text-teal-700">
-                  {batchCallProgress.completed === batchCallProgress.total
-                    ? 'All calls completed!'
-                    : `Processing ${batchCallProgress.total - batchCallProgress.completed} remaining call${batchCallProgress.total - batchCallProgress.completed !== 1 ? 's' : ''}...`}
-                </div>
-              </div>
-            )}
-            
-            <div className="flex gap-2 flex-wrap">
-              <BatchCallButton 
+          {/* Action Buttons */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/20">
+
+            {/* Call-related buttons on the left */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                className="neumorphic-button-primary"
                 onClick={() => onBatchCall()}
                 disabled={patients.length === 0 || callingInProgress}
-                loading={callingInProgress}
-              />
-              
-              {/* Export AR Testing CSV button - Only show when a specific file is selected (not All Patients) */}
-              {selectedUploadId && patients.length > 0 && (
-                <button
-                  onClick={handleExportARTesting}
-                  disabled={downloadingARTesting}
-                  className={`inline-flex items-center gap-2 px-4 py-3 border-2 border-teal-600 text-teal-700 rounded-xl font-semibold transition-all ${
-                    downloadingARTesting
-                      ? 'opacity-60 cursor-not-allowed'
-                      : 'hover:bg-teal-50 hover:shadow-lg hover:-translate-y-0.5'
-                  }`}
-                  title="Export AR Testing format CSV"
-                >
-                  {downloadingARTesting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-teal-700 border-t-transparent rounded-full animate-spin"></div>
-                      <span>Exporting...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FiDownload size={18} />
-                      <span>Export AR Testing</span>
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+              >
+                <FiPhone size={18} />
+                <span>{callingInProgress ? 'Calling...' : 'Start Calls'}</span>
+              </Button>
 
-      {/* Patient Table with Search and Filter */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        {/* Header with Search and Filter */}
-        <div className="px-6 py-4 border-b border-gray-200">
-          {/* Title on Left, Search and Filter on Right */}
-          <div className="flex items-center justify-between gap-4">
-            {/* Title - Left Side */}
-            <div className="flex-shrink-0">
-              <h3 className="text-xl font-bold text-gray-900 whitespace-nowrap">All Patients</h3>
-              <p className="text-xs text-gray-500 whitespace-nowrap">
-                {filteredPatients.length} of {patients.length}
-              </p>
-            </div>
-
-            {/* Search and Filter - Right Side */}
-            <div className="flex items-center gap-3">
-              {/* Search Bar */}
-              <div className="w-80 relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FiSearch className="h-4 w-4 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search by patient name or phone..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="block w-full pl-9 pr-9 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
-                />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    <FiX className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* Custom Filter Dropdown */}
-              <div className="w-56 flex-shrink-0 relative" ref={dropdownRef}>
-                <button
-                  ref={buttonRef}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsDropdownOpen(!isDropdownOpen);
-                  }}
-                  className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 font-medium flex items-center justify-between hover:border-teal-500 hover:shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
-                >
-                  <span className="truncate">
-                    {selectedFilterOption?.label} ({selectedFilterOption?.count})
-                  </span>
-                  <FiChevronDown 
-                    className={`ml-2 h-5 w-5 text-gray-500 flex-shrink-0 transition-transform duration-200 ${
-                      isDropdownOpen ? 'transform rotate-180' : ''
-                    }`}
-                  />
-                </button>
-
-                {isDropdownOpen && (
-                  <div className="absolute z-50 mt-2 w-full bg-white rounded-lg shadow-xl border border-gray-200 py-2">
-                    {filterOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => {
-                          setCallStatusFilter(option.value as CallStatusFilter);
-                          setIsDropdownOpen(false);
-                        }}
-                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
-                          callStatusFilter === option.value
-                            ? 'bg-teal-50 text-teal-700 font-semibold'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <span>{option.label} ({option.count})</span>
-                        {callStatusFilter === option.value && (
-                          <FiCheck className="h-5 w-5 text-teal-600" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Export Selected CSV Button - Show when there are filtered patients */}
-              {filteredPatients.length > 0 && (searchTerm.trim() || callStatusFilter !== 'all') && (
-                <button
-                  onClick={handleExportSelected}
-                  disabled={downloadingSelected || filteredPatients.length === 0}
-                  className={`inline-flex items-center gap-2 px-4 py-2.5 border-2 border-teal-700 text-teal-700 rounded-lg text-sm font-semibold transition-all ${
-                    downloadingSelected || filteredPatients.length === 0
-                      ? 'opacity-60 cursor-not-allowed border-gray-400 text-gray-400' 
-                      : 'hover:bg-teal-50 hover:shadow-sm'
-                  }`}
-                  title="Export filtered/selected patients as CSV"
-                >
-                  <FiDownload size={16} />
-                  <span>{downloadingSelected ? 'Exporting...' : 'Export Selected CSV'}</span>
-                </button>
-              )}
-
-              {/* Export Results Button - Always show when patients are loaded (icon only) */}
-              {patients.length > 0 && (
-                <DownloadButton 
-                  filename={selectedUploadId 
-                    ? (() => {
-                        const selectedUpload = availableFiles.find(f => f.id === selectedUploadId);
-                        return selectedUpload?.filename || currentFile;
-                      })()
-                    : currentFile}
-                  uploadId={selectedUploadId || undefined}
-                  disabled={patients.length === 0}
-                />
-              )}
-
-            </div>
-          </div>
-
-          {/* Active Filters and Batch Call */}
-          {(searchTerm || callStatusFilter !== 'all' || (callStatusFilter === 'all' && filteredPatients.length > 0)) && (
-            <div className="flex items-center justify-between mt-3">
-              <div className="flex items-center gap-2">
-                {(searchTerm || callStatusFilter !== 'all') && (
-                  <>
-                    <span className="text-xs text-gray-600">Active:</span>
-                    {searchTerm && (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-50 text-teal-700 rounded text-xs">
-                        "{searchTerm}"
-                        <button onClick={() => setSearchTerm('')} className="hover:text-teal-900">
-                          <FiX className="w-3 h-3" />
-                        </button>
-                      </span>
-                    )}
-                    {callStatusFilter !== 'all' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-50 text-teal-700 rounded text-xs">
-                        {callStatusFilter}
-                        <button onClick={() => setCallStatusFilter('all')} className="hover:text-teal-900">
-                          <FiX className="w-3 h-3" />
-                        </button>
-                      </span>
-                    )}
-                  </>
-                )}
-                <span className="text-xs text-gray-500">
-                  ({filteredPatients.length} {filteredPatients.length === 1 ? 'patient' : 'patients'})
-                </span>
-              </div>
-              
-              {/* Initiate Call Button for Selected Patients */}
               {selectedPatientIds.size > 0 && (
-                <button
+                <Button
+                  className="neumorphic-button-primary text-sm"
                   onClick={() => setShowSelectedCallModal(true)}
                   disabled={callingInProgress}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    callingInProgress
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-teal-600 text-white hover:bg-teal-700 hover:shadow-md'
-                  }`}
                 >
                   {callingInProgress ? (
                     <>
@@ -521,22 +379,17 @@ export const UploadSection = ({
                   ) : (
                     <>
                       <FiPhone className="w-4 h-4" />
-                      <span>Initiate Call ({selectedPatientIds.size})</span>
+                      <span>Call Selected ({selectedPatientIds.size})</span>
                     </>
                   )}
-                </button>
+                </Button>
               )}
-              
-              {/* Batch Call Button for All or Filtered Results */}
+
               {filteredPatients.length > 0 && (callStatusFilter !== 'all' || searchTerm.trim()) && selectedPatientIds.size === 0 && (
-                <button
+                <Button
+                  className="neumorphic-button-primary text-sm"
                   onClick={() => setShowBatchCallModal(true)}
                   disabled={callingInProgress}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    callingInProgress
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-teal-600 text-white hover:bg-teal-700 hover:shadow-md'
-                  }`}
                 >
                   {callingInProgress ? (
                     <>
@@ -545,33 +398,155 @@ export const UploadSection = ({
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
+                      <FiPhone className="w-4 h-4" />
                       <span>Call Filtered ({filteredPatients.length})</span>
                     </>
                   )}
-                </button>
+                </Button>
               )}
             </div>
-          )}
-        </div>
 
-        {/* Patient Table */}
-        <PatientTable 
-          patients={filteredPatients} 
-          loading={loading} 
-          onViewNotes={onViewNotes}
-          onCallPatient={onCallPatient}
-          onEndCall={onEndCall}
-          onViewCallHistory={onViewCallHistory}
-          onViewDetails={onViewDetails}
-          onUpdatePatient={handleUpdatePatient}
-          activeCalls={activeCalls}
-          selectedPatientIds={selectedPatientIds}
-          onSelectionChange={setSelectedPatientIds}
-        />
+            {/* Download/Export-related buttons on the right */}
+            <div className="flex flex-wrap gap-2">
+              {/* Export AR Testing CSV button - Only show when a specific file is selected (not All Patients) */}
+              {selectedUploadId && patients.length > 0 && (
+                <Button
+                  className="neumorphic-button-primary"
+                  onClick={handleExportARTesting}
+                  disabled={downloadingARTesting}
+                  title="Export AR Testing format CSV"
+                >
+                  {downloadingARTesting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FiDownload size={18} />
+                      <span>Export Invoice File</span>
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {/* Export Selected Button */}
+              {filteredPatients.length > 0 && (searchTerm.trim() || callStatusFilter !== 'all') && (
+                <Button
+                  className="neumorphic-button-primary text-sm"
+                  onClick={handleExportSelected}
+                  disabled={downloadingSelected || filteredPatients.length === 0}
+                  title="Export filtered/selected patients as CSV"
+                >
+                  <FiDownload size={16} />
+                  <span>{downloadingSelected ? 'Exporting...' : 'Export Selected'}</span>
+                </Button>
+              )}
+
+              {/* Export Results Button */}
+              {patients.length > 0 && (
+                <Button
+                  className="neumorphic-button-primary text-sm"
+                  onClick={async () => {
+                    if (patients.length === 0) return;
+
+                    try {
+                      const filename = selectedUploadId
+                        ? (() => {
+                          const selectedUpload = availableFiles.find(f => f.id === selectedUploadId);
+                          return selectedUpload?.filename || currentFile;
+                        })()
+                        : currentFile;
+
+                      const params: { upload_id?: number } = {};
+                      if (selectedUploadId) {
+                        params.upload_id = selectedUploadId;
+                      }
+
+                      const response = await api.get(`/download/${filename}`, {
+                        params,
+                        responseType: 'blob',
+                      });
+
+                      const blob = new Blob([response.data], { type: 'text/csv' });
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+
+                      const contentDisposition = response.headers['content-disposition'];
+                      let downloadFilename = filename;
+                      if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/i);
+                        if (filenameMatch) {
+                          downloadFilename = filenameMatch[1];
+                        }
+                      }
+
+                      if (!downloadFilename.endsWith('.csv')) {
+                        downloadFilename = `${downloadFilename}.csv`;
+                      }
+
+                      link.setAttribute('download', downloadFilename);
+                      document.body.appendChild(link);
+                      link.click();
+                      link.remove();
+                      window.URL.revokeObjectURL(url);
+                    } catch (err) {
+                      console.error('Download failed:', err);
+                      let errorMessage = 'Failed to download file';
+                      const error = err as { response?: { status?: number; data?: Blob | { detail?: string; message?: string } }; message?: string };
+
+                      if (error.response?.data instanceof Blob) {
+                        try {
+                          const text = await error.response.data.text();
+                          const jsonError = JSON.parse(text) as { detail?: string; message?: string };
+                          errorMessage = jsonError.detail || jsonError.message || errorMessage;
+                        } catch {
+                          errorMessage = error.response?.status === 401
+                            ? 'Not authenticated. Please log in again.'
+                            : 'Failed to download file';
+                        }
+                      } else {
+                        const data = error.response?.data as { detail?: string; message?: string } | undefined;
+                        errorMessage = data?.detail || data?.message || error.message || errorMessage;
+                      }
+
+                      alert(`Download failed: ${errorMessage}`);
+
+                      if (error.response?.status === 401) {
+                        const shouldRelogin = confirm('Your session may have expired. Would you like to reload the page to log in again?');
+                        if (shouldRelogin) {
+                          window.location.reload();
+                        }
+                      }
+                    }
+                  }}
+                  disabled={patients.length === 0}
+                  title="Export Results"
+                >
+                  <FiDownload size={16} />
+                  <span>Export Results</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Patient Table */}
+      <PatientTable
+        patients={filteredPatients}
+        loading={loading}
+        onViewNotes={onViewNotes}
+        onCallPatient={onCallPatient}
+        onEndCall={onEndCall}
+        onViewCallHistory={onViewCallHistory}
+        onViewDetails={onViewDetails}
+        onUpdatePatient={handleUpdatePatient}
+        activeCalls={activeCalls}
+        selectedPatientIds={selectedPatientIds}
+        onSelectionChange={setSelectedPatientIds}
+      />
 
       {/* Selected Patients Call Confirmation Modal */}
       <ConfirmModal

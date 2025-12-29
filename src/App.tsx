@@ -1,10 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
 import {
-  Header,
   MessageAlert,
   UploadSection,
-  NavigationTabs,
   ConfirmModal,
   NotesModal,
   CallHistoryModal,
@@ -18,6 +16,9 @@ import {
   ToastContainer,
   useToast
 } from './components';
+import { AppSidebar } from './components/app-sidebar';
+import { AppHeader } from './components/app-header';
+import { SidebarProvider } from './components/ui/sidebar';
 // Keep import available for easy re-enable of user management
 void UserManagement;
 import { triggerBatchCall, callPatient, endCall, getCallStatus, getBatchCallStatus } from './services/api';
@@ -38,10 +39,12 @@ function App() {
   const [currentFile, setCurrentFile] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [selectedUploadId, setSelectedUploadId] = useState<number | null>(null);
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'upload' | 'invoice-list' | 'patients' | 'users'>(() => {
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'ar-operations' | 'invoice-list' | 'patients' | 'users'>(() => {
     // Restore active section from localStorage on page load
     const storedSection = localStorage.getItem('activeSection');
-    return (storedSection as 'dashboard' | 'upload' | 'invoice-list' | 'patients' | 'users') || 'dashboard';
+    // Handle backward compatibility: convert 'upload' to 'ar-operations'
+    const section = storedSection === 'upload' ? 'ar-operations' : storedSection;
+    return (section as 'dashboard' | 'ar-operations' | 'invoice-list' | 'patients' | 'users') || 'dashboard';
   });
   const [message, setMessage] = useState<Message | null>(null);
   const [callingInProgress, setCallingInProgress] = useState(false);
@@ -80,7 +83,7 @@ function App() {
       setSelectedFile(filename);
       localStorage.setItem('currentFile', filename || 'database');
       await loadAvailableFiles();
-      
+
       // Use the upload_id directly from the API response instead of searching for it
       if (uploadId) {
         setSelectedUploadId(uploadId);
@@ -91,7 +94,7 @@ function App() {
         setSelectedUploadIdRef(null);
         await loadPatientData(null, false);
       }
-      
+
       const refreshDashboard = (window as { refreshDashboard?: () => void }).refreshDashboard;
       if (refreshDashboard) {
         refreshDashboard();
@@ -120,7 +123,7 @@ function App() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const ssoToken = urlParams.get('token');
-    
+
     if (ssoToken) {
       // Fresh SSO login: wipe any stale tokens/user data so we don't mix clinics
       localStorage.removeItem('access_token');
@@ -133,24 +136,24 @@ function App() {
       setCheckingAuth(false);
       return;
     }
-    
+
     const token = localStorage.getItem('access_token');
     const storedUser = localStorage.getItem('user');
-    
+
     if (token && storedUser) {
       setIsAuthenticated(true);
       setUser(JSON.parse(storedUser));
     }
-    
+
     const storedCurrentFile = localStorage.getItem('currentFile');
     if (storedCurrentFile) {
       setCurrentFile(storedCurrentFile);
     }
-    
+
     selectedUploadIdRef.current = null;
     localStorage.removeItem('callingInProgress');
     localStorage.removeItem('activeCalls');
-    
+
     setCheckingAuth(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -159,7 +162,7 @@ function App() {
   useEffect(() => {
     if (!checkingAuth && isAuthenticated) {
       loadAvailableFiles();
-      if (activeSection === 'upload') {
+      if (activeSection === 'ar-operations') {
         const currentUploadId = getSelectedUploadId();
         loadPatientData(currentUploadId, false);
       }
@@ -174,18 +177,18 @@ function App() {
       if (prev.size === 0 || patients.length === 0) {
         return prev;
       }
-      
+
       const newMap = new Map(prev);
       let hasChanges = false;
-      
+
       // Remove entries for patients whose call_status is completed/failed
       // AND recent_call_notes have been updated (indicating post-call processing is done)
       patients.forEach(patient => {
-        if ((patient.call_status === 'completed' || patient.call_status === 'failed') && 
-            patient.recent_call_notes && patient.recent_call_notes.trim()) {
+        if ((patient.call_status === 'completed' || patient.call_status === 'failed') &&
+          patient.recent_call_notes && patient.recent_call_notes.trim()) {
           const callKey = getPatientCallKey(patient);
           const callData = newMap.get(callKey);
-          
+
           // Only remove if notes were likely updated after this call (1 minute grace period)
           if (callData) {
             const timeSinceCall = Date.now() - callData.timestamp;
@@ -197,7 +200,7 @@ function App() {
           }
         }
       });
-      
+
       if (hasChanges) {
         activeCallsRef.current = newMap;
         return newMap;
@@ -256,7 +259,7 @@ function App() {
       setSelectedFile('');
       setCurrentFile('database');
       await loadPatientData(null, false);
-      } else {
+    } else {
       const selectedUpload = availableFiles.find(f => f.id === uploadId);
       setSelectedUploadId(uploadId);
       setSelectedUploadIdRef(uploadId);
@@ -276,7 +279,7 @@ function App() {
       const currentUploadId = getSelectedUploadId();
       let filenameToUse: string | undefined = undefined;
       let uploadIdToUse: number | undefined = undefined;
-      
+
       // If invoiceIds are provided, use them directly (don't use uploadId/filename filters)
       if (invoiceIds && invoiceIds.length > 0) {
         uploadIdToUse = undefined;
@@ -288,12 +291,12 @@ function App() {
           filenameToUse = selectedFile;
         }
       }
-      
+
       const response = await triggerBatchCall(filenameToUse, 0.01, undefined, uploadIdToUse, invoiceIds);
-      
+
       // Clear invoiceIds after use
       setBatchCallInvoiceIds(undefined);
-      
+
       if (response.results?.total_attempted === 0) {
         let message = 'No patients were eligible for calling.';
         const totalPatients = response.results?.total_patients;
@@ -314,38 +317,38 @@ function App() {
         setBatchCallProgress(null);
         return;
       }
-      
+
       const newActiveCalls = new Map(activeCalls);
       const now = Date.now();
       const batchCallSids: Array<{ callKey: string; callSid: string }> = [];
       const uniqueCallSids = new Set<string>(); // Track unique call_sids to avoid duplicates
-      
+
       if (response.results?.calls) {
         response.results.calls.forEach((call) => {
           if (call.success && call.phone_number && call.call_sid) {
-            const patient = patients.find(p => 
+            const patient = patients.find(p =>
               p.phone_number === call.phone_number &&
               p.patient_first_name === call.patient_first_name &&
               p.patient_last_name === call.patient_last_name
             );
-            
+
             if (patient) {
               const callKey = getPatientCallKey(patient);
-              newActiveCalls.set(callKey, { 
-                timestamp: now, 
+              newActiveCalls.set(callKey, {
+                timestamp: now,
                 conversationId: call.conversation_id,
                 callSid: call.call_sid
               });
-              
+
               // Track callKey -> callSid mapping for all patients
               // Multiple patients can share the same call_sid (same phone number)
-              if (activeSection === 'upload') {
+              if (activeSection === 'ar-operations') {
                 batchCallSids.push({ callKey, callSid: call.call_sid });
                 uniqueCallSids.add(call.call_sid); // Track unique call_sids
               }
             } else {
-              newActiveCalls.set(call.phone_number, { 
-                timestamp: now, 
+              newActiveCalls.set(call.phone_number, {
+                timestamp: now,
                 conversationId: call.conversation_id,
                 callSid: call.call_sid
               });
@@ -354,13 +357,13 @@ function App() {
         });
         setActiveCalls(newActiveCalls);
         activeCallsRef.current = newActiveCalls;
-        
-        if (activeSection === 'upload' && batchCallSids.length > 0) {
+
+        if (activeSection === 'ar-operations' && batchCallSids.length > 0) {
           // Track batch call SIDs for completion detection
           // Get unique call_sids (multiple patients can share same call_sid if same phone)
           const uniqueCallSidsArray = Array.from(uniqueCallSids);
           const batchCallSidsSet = new Set(uniqueCallSidsArray);
-          
+
           // Map callSid -> array of callKeys (since multiple patients can share same call_sid)
           const batchCallKeyMap = new Map<string, string[]>(); // Map callSid -> array of callKeys
           batchCallSids.forEach(({ callKey, callSid }) => {
@@ -369,17 +372,17 @@ function App() {
             }
             batchCallKeyMap.get(callSid)!.push(callKey);
           });
-          
+
           // Total unique calls (not total patients - patients sharing phone = 1 call)
           const totalBatchCalls = uniqueCallSidsArray.length;
-          
+
           // Initialize progress tracking
           setBatchCallProgress({ total: totalBatchCalls, completed: 0 });
-          
+
           let isCompleting = false; // Flag to prevent multiple simultaneous completion handlers
           let pollCount = 0;
           const maxPolls = 600; // 30 minutes safety limit (600 × 3s)
-          
+
           // Single shared polling interval that checks all batch calls in parallel via backend
           const batchPollingInterval = setInterval(async () => {
             if (pollCount >= maxPolls) {
@@ -390,27 +393,27 @@ function App() {
               localStorage.removeItem('callingInProgress');
               return;
             }
-            
+
             pollCount++;
-            
+
             // Prevent multiple simultaneous executions
             if (isCompleting) {
               return;
             }
-            
+
             // Get current active batch calls - use unique call_sids only
             const currentActiveCalls = activeCallsRef.current;
             const activeBatchCallSids = uniqueCallSidsArray.filter(callSid => {
               // Check if this call_sid is still active (has at least one patient in activeCalls)
-              return Array.from(currentActiveCalls.entries()).some(([, callData]) => 
+              return Array.from(currentActiveCalls.entries()).some(([, callData]) =>
                 callData.callSid === callSid && batchCallSidsSet.has(callSid)
               );
             });
-            
+
             // Update progress: completed = total - active
             const completedCalls = totalBatchCalls - activeBatchCallSids.length;
             setBatchCallProgress({ total: totalBatchCalls, completed: completedCalls });
-            
+
             // If no active batch calls, check if we should complete
             if (activeBatchCallSids.length === 0) {
               clearInterval(batchPollingInterval);
@@ -434,22 +437,22 @@ function App() {
               }
               return;
             }
-            
+
             try {
               // Use batch endpoint to check all calls in parallel on backend
               const batchStatusResponse = await getBatchCallStatus(activeBatchCallSids);
-              
+
               if (batchStatusResponse.success && batchStatusResponse.results) {
                 // Update activeCalls with latest status for each call
                 setActiveCalls(prev => {
                   const newMap = new Map(prev);
                   let hasChanges = false;
-                  
+
                   Object.entries(batchStatusResponse.results).forEach(([callSid, statusResult]) => {
                     const callKeys = batchCallKeyMap.get(callSid); // Array of callKeys for this call_sid
                     if (callKeys && callKeys.length > 0) {
                       const callStatus = statusResult.status;
-                      
+
                       // Update activeCalls with latest status for ALL patients sharing this call_sid
                       callKeys.forEach(callKey => {
                         const existingCall = newMap.get(callKey);
@@ -460,44 +463,44 @@ function App() {
                           });
                           hasChanges = true;
                         }
-                        
+
                         // Remove completed calls from activeCalls (all patients sharing this call_sid)
                         if (statusResult.should_stop_polling) {
                           newMap.delete(callKey);
                           hasChanges = true;
                         }
                       });
-                      
+
                       if (statusResult.should_stop_polling) {
                         console.log(`✅ Call ${callSid} ${callStatus || 'completed'} - removed ${callKeys.length} patient(s) from activeCalls`);
                       }
                     }
                   });
-                  
+
                   if (hasChanges) {
                     activeCallsRef.current = newMap;
                     return newMap;
                   }
                   return prev;
                 });
-                
+
                 // Check if all calls are completed (backend tells us)
                 if (batchStatusResponse.all_completed) {
                   clearInterval(batchPollingInterval);
                   pollingIntervalsRef.current.delete('batch_polling');
-                  
+
                   if (!isCompleting) {
                     isCompleting = true;
                     console.log(`✅ All ${totalBatchCalls} batch call${totalBatchCalls !== 1 ? 's' : ''} completed - stopping polling and refreshing data`);
-                    
+
                     setBatchCallProgress({ total: totalBatchCalls, completed: totalBatchCalls });
                     setCallingInProgress(false);
                     localStorage.removeItem('callingInProgress');
-                    
+
                     // Show completion message
                     showMessage('success', `All ${totalBatchCalls} call${totalBatchCalls !== 1 ? 's' : ''} completed.`);
                     showToast('success', `All ${totalBatchCalls} call${totalBatchCalls !== 1 ? 's' : ''} completed.`);
-                    
+
                     // IMMEDIATELY refresh patient data to get updated call status and notes
                     const currentUploadId = getSelectedUploadId();
                     try {
@@ -506,7 +509,7 @@ function App() {
                     } catch (error) {
                       console.error('Failed to refresh patient data after batch calls:', error);
                     }
-                    
+
                     // Refresh file upload history to update call statuses
                     try {
                       await loadAvailableFiles();
@@ -514,7 +517,7 @@ function App() {
                     } catch (error) {
                       console.error('Failed to refresh file upload history after batch calls:', error);
                     }
-                    
+
                     // Clear progress after a short delay
                     setTimeout(() => setBatchCallProgress(null), 3000);
                   }
@@ -525,7 +528,7 @@ function App() {
               // Continue polling on error (don't stop)
             }
           }, 3000); // Poll every 3 seconds
-          
+
           // Store the interval reference
           pollingIntervalsRef.current.set('batch_polling', batchPollingInterval);
         } else {
@@ -533,7 +536,7 @@ function App() {
           localStorage.removeItem('callingInProgress');
           setBatchCallProgress(null);
         }
-        
+
         showMessage('success', `Successfully initiated ${response.results?.total_attempted || 0} call(s).`);
       } else {
         showMessage('error', 'Failed to initiate batch calls. Please try again.');
@@ -586,23 +589,23 @@ function App() {
 
   const handleCallPatient = (patient: Patient) => {
     const phone = patient.phone_number && patient.phone_number.toLowerCase() !== 'nan' ? patient.phone_number : '';
-    
+
     if (!phone || phone.length < 10) {
       showMessage('error', 'Cannot make call: Phone number is missing or invalid (minimum 10 digits required)');
       return;
     }
-    
+
     // Validate patient name and DOB instead of invoice_number
     if (!patient.patient_first_name || !patient.patient_last_name) {
       showMessage('error', 'Cannot make call: Patient name is missing (required for identification)');
       return;
     }
-    
+
     if (!patient.patient_dob) {
       showMessage('error', 'Cannot make call: Patient date of birth is missing (required for identification)');
       return;
     }
-    
+
     setPatientToCall(patient);
     setShowCallConfirmModal(true);
   };
@@ -627,25 +630,25 @@ function App() {
         patient.patient_last_name,
         patient.patient_dob
       );
-      
+
       if (response.success) {
         const callKey = getPatientCallKey(patient);
         const newActiveCalls = new Map(activeCalls);
-        newActiveCalls.set(callKey, { 
+        newActiveCalls.set(callKey, {
           timestamp: Date.now(),
           conversationId: response.conversation_id,
           callSid: (response as { call_sid?: string }).call_sid
         });
         setActiveCalls(newActiveCalls);
         activeCallsRef.current = newActiveCalls;
-        
+
         showMessage('success', response.message || `Call initiated to ${fullName}`);
         showToast('success', `Call initiated to ${fullName}`);
-        
+
         // Start polling call status using the new endpoint
-        if (activeSection === 'upload' && (response as { call_sid?: string }).call_sid) {
+        if (activeSection === 'ar-operations' && (response as { call_sid?: string }).call_sid) {
           const callSid = (response as { call_sid?: string }).call_sid!;
-          
+
           // Clear any existing interval for this call
           const existingInterval = pollingIntervalsRef.current.get(callKey);
           if (existingInterval) {
@@ -653,10 +656,10 @@ function App() {
             clearInterval(existingInterval);
             pollingIntervalsRef.current.delete(callKey);
           }
-          
+
           let pollCount = 0;
           const maxPolls = 600; // Safety limit: 30 minutes (600 × 3s)
-          
+
           const singleCallRefreshInterval = setInterval(async () => {
             // Safety check: stop after 30 minutes (failsafe for stuck calls)
             if (pollCount >= maxPolls) {
@@ -671,9 +674,9 @@ function App() {
               });
               return;
             }
-            
+
             pollCount++;
-            
+
             // Check if call is still in activeCalls (might have been removed)
             const currentCallData = activeCallsRef.current.get(callKey);
             if (!currentCallData) {
@@ -682,15 +685,15 @@ function App() {
               pollingIntervalsRef.current.delete(callKey);
               return;
             }
-            
-            if (activeSection === 'upload') {
+
+            if (activeSection === 'ar-operations') {
               try {
                 // Check real-time call status
                 const statusResponse = await getCallStatus(callSid);
-                
+
                 // Statuses: queued, ringing, in-progress, completed, busy, failed, no-answer, canceled
                 const callStatus = statusResponse.status || statusResponse.twilio?.status;
-                
+
                 // Update activeCalls with latest status
                 setActiveCalls(prev => {
                   const newMap = new Map(prev);
@@ -704,9 +707,9 @@ function App() {
                   }
                   return newMap;
                 });
-                
+
                 const isCallComplete = callStatus && ['completed', 'busy', 'failed', 'no-answer', 'canceled'].includes(callStatus);
-                
+
                 if (isCallComplete || statusResponse.should_stop_polling) {
                   console.log(`✅ Call ${callStatus} - stopping polling immediately`);
                   // Call has ended - stop polling and remove from activeCalls
@@ -718,7 +721,7 @@ function App() {
                   } catch (error) {
                     console.error('Failed to refresh patient data after single call:', error);
                   }
-                  
+
                   // Refresh file upload history to update call statuses
                   try {
                     await loadAvailableFiles();
@@ -726,7 +729,7 @@ function App() {
                   } catch (error) {
                     console.error('Failed to refresh file upload history after single call:', error);
                   }
-                  
+
                   // Remove from activeCalls and stop polling
                   setActiveCalls(prev => {
                     const newMap = new Map(prev);
@@ -752,7 +755,7 @@ function App() {
               }
             }
           }, 3000); // Poll every 3 seconds - continues until call completes
-          
+
           // Store the interval reference
           pollingIntervalsRef.current.set(callKey, singleCallRefreshInterval);
         }
@@ -771,7 +774,7 @@ function App() {
   const handleEndCall = async (patient: Patient) => {
     const callKey = getPatientCallKey(patient);
     const activeCall = activeCalls.get(callKey);
-    
+
     if (!activeCall || !activeCall.conversationId) {
       showMessage('error', 'No active call found for this patient');
       return;
@@ -780,42 +783,42 @@ function App() {
     try {
       const fullName = getPatientFullName(patient);
       showToast('info', `Ending call with ${fullName}...`);
-      
+
       const response = await endCall(activeCall.conversationId);
-      
+
       if (response.success) {
         console.log('✅ Manual disconnect - will poll for 5 more seconds to catch post-call webhook');
-        
+
         showToast('success', `Call ended with ${fullName}`);
-        
+
         // Keep polling for 5 more seconds to catch the post-call webhook with summary
         setTimeout(() => {
           console.log('🛑 5 seconds elapsed - stopping polling for disconnected call');
-        
-        // Clear the polling interval for this call
-        const existingInterval = pollingIntervalsRef.current.get(callKey);
-        if (existingInterval) {
-          clearInterval(existingInterval);
-          pollingIntervalsRef.current.delete(callKey);
-        }
-        
+
+          // Clear the polling interval for this call
+          const existingInterval = pollingIntervalsRef.current.get(callKey);
+          if (existingInterval) {
+            clearInterval(existingInterval);
+            pollingIntervalsRef.current.delete(callKey);
+          }
+
           // Remove from activeCalls
-        setActiveCalls(prev => {
-          const newMap = new Map(prev);
-          newMap.delete(callKey);
+          setActiveCalls(prev => {
+            const newMap = new Map(prev);
+            newMap.delete(callKey);
             activeCallsRef.current = newMap;
-          return newMap;
-        });
-        
+            return newMap;
+          });
+
           // Final refresh to get updated notes from webhook
-          if (activeSection === 'upload') {
+          if (activeSection === 'ar-operations') {
             const currentUploadId = getSelectedUploadId();
             loadPatientData(currentUploadId, true);
           }
         }, 5000); // Wait 5 seconds
-        
+
         // Immediate refresh to update call status
-        if (activeSection === 'upload') {
+        if (activeSection === 'ar-operations') {
           const currentUploadId = getSelectedUploadId();
           await loadPatientData(currentUploadId, true);
         }
@@ -829,10 +832,10 @@ function App() {
     }
   };
 
-  const handleSectionChange = (section: 'dashboard' | 'upload' | 'invoice-list' | 'patients' | 'users') => {
+  const handleSectionChange = (section: 'dashboard' | 'ar-operations' | 'invoice-list' | 'patients' | 'users') => {
     // Save active section to localStorage so it persists on page refresh
     localStorage.setItem('activeSection', section);
-    
+
     if (section === 'dashboard') {
       stopAutoRefresh();
       setActiveSection('dashboard');
@@ -842,8 +845,8 @@ function App() {
           refreshDashboard();
         }
       }, 100);
-    } else if (section === 'upload') {
-      setActiveSection('upload');
+    } else if (section === 'ar-operations') {
+      setActiveSection('ar-operations');
       const currentUploadId = getSelectedUploadId();
       loadPatientData(currentUploadId, false);
     } else {
@@ -870,124 +873,143 @@ function App() {
     return <LoginPage onLogin={handleLogin} />;
   }
 
-  const isAdmin = user?.role === 'admin';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <Header user={user} onLogout={handleLogout} />
-      <div className="max-w-[1920px] mx-auto px-8 py-6 relative z-0">
-        {message && <MessageAlert message={message} />}
-        <ToastContainer toasts={toasts} onRemove={removeToast} />
-
-        <NavigationTabs
-          activeSection={activeSection}
-          isAdmin={isAdmin}
-          onSectionChange={handleSectionChange}
-        />
-
-        {activeSection === 'dashboard' && (
-          <div className="mb-8 space-y-6">
-            <Dashboard />
-          </div>
-        )}
-
-        {activeSection === 'invoice-list' && (
-          <div className="mb-8">
-            <InvoiceList onFileSelect={() => {}} />
-          </div>
-        )}
-
-        {activeSection === 'patients' && (
-          <div className="mb-8">
-            <PatientsTab
-              onViewNotes={handleViewNotes}
-              onViewCallHistory={handleViewCallHistory}
-              onViewDetails={handleViewDetails}
-              showMessage={showMessage}
-            />
-          </div>
-        )}
-
-        {/* {activeSection === 'users' && isAdmin && <UserManagement />} */}
-
-        {activeSection === 'upload' && (
-          <UploadSection
-            availableFiles={availableFiles}
-            selectedUploadId={selectedUploadId}
-                patients={patients} 
-                loading={loading} 
-            uploadLoading={uploadLoading}
-            callingInProgress={callingInProgress}
-            activeCalls={activeCalls}
-            batchCallProgress={batchCallProgress}
-            currentFile={currentFile}
-            onFileUpload={handleFileUpload}
-            onFileSelect={handleFileSelect}
-            onBatchCall={handleBatchCall}
-                onViewNotes={handleViewNotes}
-                onCallPatient={handleCallPatient}
-                onEndCall={handleEndCall}
-                onViewCallHistory={handleViewCallHistory}
-            onRefreshPatients={async () => {
-              await loadPatientData(selectedUploadId, true); // silent=true to avoid showing loading message
-            }}
-                onViewDetails={handleViewDetails}
-              />
-        )}
-
-        <ConfirmModal
-          isOpen={showConfirmModal}
-          title="Start Batch Calls"
-          message={batchCallInvoiceIds && batchCallInvoiceIds.length > 0
-            ? `You are about to initiate calls to ${batchCallInvoiceIds.length} selected patient${batchCallInvoiceIds.length !== 1 ? 's' : ''}. Calls will be made automatically and summaries will be generated after each call completes. Patients with the same phone number will be grouped into a single call.`
-            : `You are about to initiate calls to ${patients.length} patient${patients.length !== 1 ? 's' : ''}. Calls will be made automatically and summaries will be generated after each call completes.`}
-          onConfirm={confirmBatchCall}
-          onCancel={() => {
-            setShowConfirmModal(false);
-            setBatchCallInvoiceIds(undefined);
-          }}
-        />
-
-        <ConfirmModal
-          isOpen={showCallConfirmModal}
-          title="Call Patient"
-          message={`Are you sure you want to call ${patientToCall ? getPatientFullName(patientToCall) : 'this patient'} at ${patientToCall?.phone_number || ''}?`}
-          onConfirm={confirmCallPatient}
-          onCancel={() => {
-            setShowCallConfirmModal(false);
-            setPatientToCall(null);
-          }}
-        />
-
-        <NotesModal
-          isOpen={showNotesModal}
-          patientFirstName={selectedPatient?.patient_first_name || ''}
-          patientLastName={selectedPatient?.patient_last_name || ''}
-          notes={selectedPatient?.notes || ''}
-          onClose={() => setShowNotesModal(false)}
-        />
-
-        <CallHistoryModal
-          isOpen={showCallHistoryModal}
-          patientFirstName={selectedPatient?.patient_first_name || ''}
-          patientLastName={selectedPatient?.patient_last_name || ''}
-          phoneNumber={selectedPatient?.phone_number || ''}
-          invoiceNumber={selectedPatient?.invoice_number || ''}
-          patientDob={selectedPatient?.patient_dob || ''}
-          onClose={() => setShowCallHistoryModal(false)}
-        />
-
-        {showPatientDetails && selectedPatient && (
-          <PatientDetails
-            invoiceId={selectedPatient.id}
-            phoneNumber={selectedPatient.phone_number}
-            invoiceNumber={selectedPatient.invoice_number}
-            patientFirstName={selectedPatient.patient_first_name}
-            patientLastName={selectedPatient.patient_last_name}
-            isOpen={showPatientDetails}
-            onClose={() => setShowPatientDetails(false)}
+    <div className="relative min-h-screen bg-[#d4d7e9]">
+      {/* APP CONTENT */}
+      <div className="relative z-10 min-h-screen">
+        <SidebarProvider
+          style={
+            {
+              "--sidebar-width": "calc(var(--spacing) * 64)",
+            } as React.CSSProperties
+          }
+        >
+          <AppSidebar
+            variant="floating"
+            onPageChange={(page: string) => handleSectionChange(page as 'dashboard' | 'ar-operations' | 'invoice-list' | 'patients' | 'users')}
+            currentPage={activeSection}
+            onLogout={handleLogout}
+            userData={user}
           />
-        )}
+          <main className="main-content-wrapper">
+            <AppHeader currentPage={activeSection} />
+            <div className="main-content-scrollable">
+              <div className="@container/main flex flex-1 flex-col my-2">
+                <div className="flex flex-col">
+                  {message && <MessageAlert message={message} />}
+                  <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+                  {activeSection === 'dashboard' && (
+                    <div className="mb-4 sm:mb-8 space-y-4 sm:space-y-6 px-4 lg:px-6">
+                      <Dashboard />
+                    </div>
+                  )}
+
+                  {activeSection === 'invoice-list' && (
+                    <div className="mb-8 px-4 lg:px-6">
+                      <InvoiceList onFileSelect={() => { }} />
+                    </div>
+                  )}
+
+                  {activeSection === 'patients' && (
+                    <div className="mb-8 px-4 lg:px-6">
+                      <PatientsTab
+                        onViewNotes={handleViewNotes}
+                        onViewCallHistory={handleViewCallHistory}
+                        onViewDetails={handleViewDetails}
+                        showMessage={showMessage}
+                      />
+                    </div>
+                  )}
+
+                  {/* {activeSection === 'users' && isAdmin && <UserManagement />} */}
+
+                  {activeSection === 'ar-operations' && (
+                    <div className="px-4 lg:px-6">
+                      <UploadSection
+                        availableFiles={availableFiles}
+                        selectedUploadId={selectedUploadId}
+                        patients={patients}
+                        loading={loading}
+                        uploadLoading={uploadLoading}
+                        callingInProgress={callingInProgress}
+                        activeCalls={activeCalls}
+                        batchCallProgress={batchCallProgress}
+                        currentFile={currentFile}
+                        onFileUpload={handleFileUpload}
+                        onFileSelect={handleFileSelect}
+                        onBatchCall={handleBatchCall}
+                        onViewNotes={handleViewNotes}
+                        onCallPatient={handleCallPatient}
+                        onEndCall={handleEndCall}
+                        onViewCallHistory={handleViewCallHistory}
+                        onRefreshPatients={async () => {
+                          await loadPatientData(selectedUploadId, true); // silent=true to avoid showing loading message
+                        }}
+                        onViewDetails={handleViewDetails}
+                      />
+                    </div>
+                  )}
+
+                  <ConfirmModal
+                    isOpen={showConfirmModal}
+                    title="Start Batch Calls"
+                    message={batchCallInvoiceIds && batchCallInvoiceIds.length > 0
+                      ? `You are about to initiate calls to ${batchCallInvoiceIds.length} selected patient${batchCallInvoiceIds.length !== 1 ? 's' : ''}. Calls will be made automatically and summaries will be generated after each call completes. Patients with the same phone number will be grouped into a single call.`
+                      : `You are about to initiate calls to ${patients.length} patient${patients.length !== 1 ? 's' : ''}. Calls will be made automatically and summaries will be generated after each call completes.`}
+                    onConfirm={confirmBatchCall}
+                    onCancel={() => {
+                      setShowConfirmModal(false);
+                      setBatchCallInvoiceIds(undefined);
+                    }}
+                  />
+
+                  <ConfirmModal
+                    isOpen={showCallConfirmModal}
+                    title="Call Patient"
+                    message={`Are you sure you want to call ${patientToCall ? getPatientFullName(patientToCall) : 'this patient'} at ${patientToCall?.phone_number || ''}?`}
+                    onConfirm={confirmCallPatient}
+                    onCancel={() => {
+                      setShowCallConfirmModal(false);
+                      setPatientToCall(null);
+                    }}
+                  />
+
+                  <NotesModal
+                    isOpen={showNotesModal}
+                    patientFirstName={selectedPatient?.patient_first_name || ''}
+                    patientLastName={selectedPatient?.patient_last_name || ''}
+                    notes={selectedPatient?.notes || ''}
+                    onClose={() => setShowNotesModal(false)}
+                  />
+
+                  <CallHistoryModal
+                    isOpen={showCallHistoryModal}
+                    patientFirstName={selectedPatient?.patient_first_name || ''}
+                    patientLastName={selectedPatient?.patient_last_name || ''}
+                    phoneNumber={selectedPatient?.phone_number || ''}
+                    invoiceNumber={selectedPatient?.invoice_number || ''}
+                    patientDob={selectedPatient?.patient_dob || ''}
+                    onClose={() => setShowCallHistoryModal(false)}
+                  />
+
+                  {showPatientDetails && selectedPatient && (
+                    <PatientDetails
+                      invoiceId={selectedPatient.id}
+                      phoneNumber={selectedPatient.phone_number}
+                      invoiceNumber={selectedPatient.invoice_number}
+                      patientFirstName={selectedPatient.patient_first_name}
+                      patientLastName={selectedPatient.patient_last_name}
+                      isOpen={showPatientDetails}
+                      onClose={() => setShowPatientDetails(false)}
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          </main>
+        </SidebarProvider>
       </div>
     </div>
   );

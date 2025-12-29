@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { FiX, FiUser, FiFileText, FiShield, FiEdit2, FiCheck } from 'react-icons/fi';
+import { FiX, FiUser, FiCalendar, FiPhone, FiShield, FiDollarSign, FiFileText, FiEdit2, FiCheck, FiClock, FiHash } from 'react-icons/fi';
 import { getPatientDetails, updatePatient } from '../services/api';
 import type { Patient } from '../types';
+import { Button } from './ui/button';
 
 interface PatientDetailsProps {
   invoiceId?: number;
@@ -13,14 +14,14 @@ interface PatientDetailsProps {
   isOpen?: boolean;
 }
 
-export const PatientDetails = ({ 
-  invoiceId, 
-  phoneNumber, 
-  invoiceNumber, 
-  patientFirstName, 
+export const PatientDetails = ({
+  invoiceId,
+  phoneNumber,
+  invoiceNumber,
+  patientFirstName,
   patientLastName,
-  onClose, 
-  isOpen = true 
+  onClose,
+  isOpen = true
 }: PatientDetailsProps) => {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,40 +32,28 @@ export const PatientDetails = ({
 
   useEffect(() => {
     const fetchPatientDetails = async () => {
-      // Check if modal is open and we have enough information to fetch
-      if (!isOpen) {
-        return;
-      }
-      
-      // Reset state when opening
+      if (!isOpen) return;
+
       setPatient(null);
       setError(null);
       setLoading(true);
-      
-      // Check if we have enough information
+
       const hasPhoneNumber = phoneNumber && phoneNumber.trim() !== '' && phoneNumber.toLowerCase() !== 'nan';
-      // invoice_number no longer required - removed from validation
       const hasFirstName = patientFirstName && patientFirstName.trim() !== '' && patientFirstName.toLowerCase() !== 'nan';
       const hasLastName = patientLastName && patientLastName.trim() !== '' && patientLastName.toLowerCase() !== 'nan';
-      
+
       if (!invoiceId && (!hasPhoneNumber || !hasFirstName || !hasLastName)) {
         const missingFields = [];
         if (!hasPhoneNumber) missingFields.push('phone number');
         if (!hasFirstName) missingFields.push('first name');
         if (!hasLastName) missingFields.push('last name');
-        setError(`Insufficient information to load patient details. Missing: ${missingFields.join(', ')}`);
+        setError(`Missing: ${missingFields.join(', ')}`);
         setLoading(false);
         return;
       }
 
       try {
-        const response = await getPatientDetails(
-          invoiceId,
-          phoneNumber,
-          invoiceNumber,
-          patientFirstName,
-          patientLastName
-        );
+        const response = await getPatientDetails(invoiceId, phoneNumber, invoiceNumber, patientFirstName, patientLastName);
         if (response.success) {
           setPatient(response.patient);
         } else {
@@ -82,76 +71,44 @@ export const PatientDetails = ({
       }
     };
 
-    if (isOpen) {
-      fetchPatientDetails();
-    }
+    if (isOpen) fetchPatientDetails();
   }, [invoiceId, phoneNumber, invoiceNumber, patientFirstName, patientLastName, isOpen]);
 
-  // Handle DOB update
   const handleSaveDOB = async () => {
     if (!patient?.id || updating) return;
-    
     try {
       setUpdating(true);
       await updatePatient(patient.id, { patient_dob: dobValue });
-      // Refresh patient details
-      const response = await getPatientDetails(
-        invoiceId,
-        phoneNumber,
-        invoiceNumber,
-        patientFirstName,
-        patientLastName
-      );
-      if (response.success) {
-        setPatient(response.patient);
-      }
+      const response = await getPatientDetails(invoiceId, phoneNumber, invoiceNumber, patientFirstName, patientLastName);
+      if (response.success) setPatient(response.patient);
       setEditingDOB(false);
       setDobValue('');
-    } catch (error) {
-      console.error('Failed to update DOB:', error);
+    } catch {
       alert('Failed to update DOB. Please try again.');
     } finally {
       setUpdating(false);
     }
   };
 
-  // Always render the modal backdrop if isOpen is true, even if there's an error
-  if (!isOpen) {
-    return null;
-  }
+  if (!isOpen) return null;
 
   const formatCurrency = (amount: string | number | undefined): string => {
     if (!amount) return '$0.00';
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
     if (isNaN(numAmount)) return '$0.00';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(numAmount);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(numAmount);
   };
 
   const formatDate = (dateStr: string | undefined): string => {
     if (!dateStr) return '-';
     try {
-      // For date-only fields (like DOB), parse components directly to avoid timezone conversion
-      const dateParts = dateStr.split('T')[0].split('-'); // Get YYYY-MM-DD part
+      const dateParts = dateStr.split('T')[0].split('-');
       if (dateParts.length === 3) {
         const [year, month, day] = dateParts.map(p => parseInt(p, 10));
-        // Create date using local timezone components (no conversion)
-        const date = new Date(year, month - 1, day); // month is 0-indexed
-        return date.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
+        const date = new Date(year, month - 1, day);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
       }
-      // Fallback for other formats
-      return new Date(dateStr).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
+      return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     } catch {
       return dateStr;
     }
@@ -160,403 +117,284 @@ export const PatientDetails = ({
   const formatDateTime = (dateStr: string | undefined): string => {
     if (!dateStr) return '-';
     try {
-      return new Date(dateStr).toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit'
-      });
+      return new Date(dateStr).toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     } catch {
       return dateStr;
     }
   };
 
+  // Field component for consistent styling
+  const Field = ({ label, value, mono = false, icon }: { label: string; value: string; mono?: boolean; icon?: React.ReactNode }) => (
+    <div className="flex items-start gap-3 p-3 bg-white/30 rounded-xl border border-white/40 backdrop-blur-sm hover:bg-white/40 transition-colors">
+      {icon && <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">{icon}</div>}
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-foreground  tracking-wide mb-0.5">{label}</p>
+        <p className={`text-sm font-semibold text-foreground truncate ${mono ? 'font-mono' : ''}`}>{value}</p>
+      </div>
+    </div>
+  );
+
+  // Badge component for status fields
+  const Badge = ({ value, variant }: { value: string; variant: 'success' | 'warning' | 'error' | 'neutral' }) => {
+    const variants = {
+      success: 'bg-gradient-to-r from-emerald-500/90 to-teal-500/90 text-foreground',
+      warning: 'bg-gradient-to-r from-amber-500/90 to-orange-500/90 text-foreground',
+      error: 'bg-gradient-to-r from-red-500/90 to-rose-500/90 text-foreground',
+      neutral: 'bg-white/40 text-foreground border border-white/50'
+    };
+    return <span className={`px-3 py-1 rounded-lg text-xs font-semibold ${variants[variant]}`}>{value}</span>;
+  };
+
+  // Section component with consistent styling
+  const Section = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
+    <div className="liquid-glass-table rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-3 pb-2 border-b border-white/30">
+        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-lg">
+          {icon}
+        </div>
+        <h3 className="text-base font-bold text-foreground">{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+
+  // Loading state
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8 max-w-2xl w-full mx-4">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading patient details...</p>
-          </div>
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[9999] p-4" onClick={onClose}>
+        <div className="liquid-glass rounded-2xl p-8 max-w-md w-full text-center" onClick={e => e.stopPropagation()}>
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm text-foreground">Loading patient details...</p>
         </div>
       </div>
     );
   }
 
+  // Error state
   if (error) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8 max-w-2xl w-full mx-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">Error</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <FiX size={24} />
-            </button>
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[9999] p-4" onClick={onClose}>
+        <div className="liquid-glass rounded-2xl p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-foreground">Error</h2>
+            <Button onClick={onClose} className="p-2 hover:bg-white/30 rounded-lg transition-colors">
+              <FiX size={20} className="text-foreground" />
+            </Button>
           </div>
-          <p className="text-red-600 mb-4">{error}</p>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-          >
+          <p className="text-foreground mb-4">{error}</p>
+          <Button onClick={onClose} className="w-full py-2.5 bg-gradient-to-r from-primary to-primary/80 text-white font-medium rounded-xl">
             Close
-          </button>
+          </Button>
         </div>
       </div>
     );
   }
 
-  // If no patient data after loading completes, show message
-  if (!loading && !error && !patient) {
+  // No data state
+  if (!patient) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8 max-w-2xl w-full mx-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">No Data</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <FiX size={24} />
-            </button>
+      <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[9999] p-4" onClick={onClose}>
+        <div className="liquid-glass rounded-2xl p-6 max-w-md w-full" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-foreground">No Data</h2>
+            <Button onClick={onClose} className="p-2 hover:bg-white/30 rounded-lg transition-colors">
+              <FiX size={20} className="text-foreground" />
+            </Button>
           </div>
-          <p className="text-gray-600 mb-4">No patient data available.</p>
-          <button
-            onClick={onClose}
-            className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors"
-          >
+          <p className="text-foreground mb-4">No patient data available.</p>
+          <Button onClick={onClose} className="w-full py-2.5 bg-gradient-to-r from-primary to-primary/80 text-white font-medium rounded-xl">
             Close
-          </button>
+          </Button>
         </div>
       </div>
     );
-  }
-
-  // If still loading or has error, those states are already rendered above
-  if (loading || error || !patient) {
-    return null;
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-8 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[9999] p-4 overflow-y-auto" onClick={onClose}>
+      <div
+        className="liquid-glass rounded-2xl max-w-4xl w-full my-4 max-h-[90vh] flex flex-col overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-teal-600 to-cyan-600 text-white p-6 rounded-t-lg flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <FiUser />
-              Patient Information
-            </h2>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/30 bg-white/10 backdrop-blur-xl flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center">
+              <FiUser className="text-white" size={20} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-foreground">Patient Details</h2>
+              <p className="text-xs text-foreground">{patient.patient_first_name} {patient.patient_last_name}</p>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-white hover:text-gray-200 transition-colors p-2"
-          >
-            <FiX size={24} />
-          </button>
+          <Button onClick={onClose} className="px-6 py-2.5 bg-gradient-to-r from-primary to-primary/80 text-white font-medium rounded-xl shadow-lg hover:shadow-xl hover:translate-y-[-1px] transition-all duration-200">
+            Close
+          </Button>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6">
+        {/* Content - Scrollable */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+
           {/* Patient Information */}
-          <section className="bg-gray-50 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <FiUser className="text-teal-600" />
-              Patient Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-600">First Name</label>
-                <p className="text-gray-900">{patient.patient_first_name || '-'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Last Name</label>
-                <p className="text-gray-900">{patient.patient_last_name || '-'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Date of Birth</label>
-                {editingDOB ? (
-                  <div className="flex items-center gap-2 mt-1">
-                    <input
-                      type="text"
-                      value={dobValue}
-                      onChange={(e) => setDobValue(e.target.value)}
-                      placeholder="MM/DD/YYYY"
-                      className="flex-1 px-3 py-2 border border-teal-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-sm"
-                      autoFocus
-                      disabled={updating}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleSaveDOB();
-                        } else if (e.key === 'Escape') {
-                          setEditingDOB(false);
-                          setDobValue('');
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={handleSaveDOB}
-                      disabled={updating}
-                      className="p-2 text-green-600 hover:text-green-800 disabled:opacity-50 transition-colors"
-                      title="Save"
-                    >
-                      <FiCheck size={18} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingDOB(false);
-                        setDobValue('');
-                      }}
-                      disabled={updating}
-                      className="p-2 text-red-600 hover:text-red-800 disabled:opacity-50 transition-colors"
-                      title="Cancel"
-                    >
-                      <FiX size={18} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 group">
-                    <p className="text-gray-900">{formatDate(patient.patient_dob)}</p>
-                    {patient.id && (
-                      <button
-                        onClick={() => {
-                          // Format DOB for editing (MM/DD/YYYY)
-                          if (patient.patient_dob) {
-                            try {
-                              const dateStr = patient.patient_dob;
-                              const parts = dateStr.includes('T') ? dateStr.split('T')[0].split('-') : dateStr.split('-');
-                              if (parts.length === 3) {
-                                const [year, month, day] = parts;
-                                setDobValue(`${month}/${day}/${year}`);
-                              } else {
-                                setDobValue(patient.patient_dob);
+          <Section title="Patient Information" icon={<FiUser className="text-white" size={18} />}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <Field label="First Name" value={patient.patient_first_name || '-'} icon={<FiUser className="text-primary" size={14} />} />
+              <Field label="Last Name" value={patient.patient_last_name || '-'} icon={<FiUser className="text-primary" size={14} />} />
+
+              {/* Date of Birth - Editable */}
+              <div className="flex items-start gap-3 p-3 bg-white/30 rounded-xl border border-white/40 backdrop-blur-sm">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <FiCalendar className="text-primary" size={14} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-foreground  tracking-wide mb-0.5">Date of Birth</p>
+                  {editingDOB ? (
+                    <div className="flex items-center gap-1 mt-1">
+                      <input
+                        type="text"
+                        value={dobValue}
+                        onChange={e => setDobValue(e.target.value)}
+                        placeholder="MM/DD/YYYY"
+                        className="flex-1 px-2 py-1 text-sm bg-white/60 border border-white/50 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary"
+                        autoFocus
+                        disabled={updating}
+                        onKeyDown={e => { if (e.key === 'Enter') handleSaveDOB(); else if (e.key === 'Escape') { setEditingDOB(false); setDobValue(''); } }}
+                      />
+                      <Button onClick={handleSaveDOB} disabled={updating} className="p-1.5 bg-emerald-500 text-white rounded-lg disabled:opacity-50">
+                        <FiCheck size={14} />
+                      </Button>
+                      <Button onClick={() => { setEditingDOB(false); setDobValue(''); }} disabled={updating} className="p-1.5 bg-red-500 text-white rounded-lg disabled:opacity-50">
+                        <FiX size={14} />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 group">
+                      <p className="text-sm font-semibold text-foreground">{formatDate(patient.patient_dob)}</p>
+                      {patient.id && (
+                        <Button
+                          onClick={() => {
+                            if (patient.patient_dob) {
+                              try {
+                                const dateStr = patient.patient_dob;
+                                const parts = dateStr.includes('T') ? dateStr.split('T')[0].split('-') : dateStr.split('-');
+                                if (parts.length === 3) {
+                                  const [year, month, day] = parts;
+                                  setDobValue(`${month}/${day}/${year}`);
+                                } else {
+                                  setDobValue(patient.patient_dob);
+                                }
+                              } catch {
+                                setDobValue(patient.patient_dob || '');
                               }
-                            } catch {
-                              setDobValue(patient.patient_dob || '');
                             }
-                          } else {
-                            setDobValue('');
-                          }
-                          setEditingDOB(true);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 text-teal-600 hover:text-teal-800 transition-opacity"
-                        title="Edit DOB"
-                      >
-                        <FiEdit2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                )}
+                            setEditingDOB(true);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-foreground hover:bg-white/30 rounded transition-all"
+                        >
+                          <FiEdit2 size={12} />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Patient Account #</label>
-                <p className="text-gray-900 font-mono">{patient.patient_account_number || '-'}</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Phone Number</label>
-                <p className="text-gray-900 font-mono">{patient.phone_number || '-'}</p>
-              </div>
-              {/* Invoice Number hidden from UI */}
-              <div>
-                <label className="text-sm font-medium text-gray-600">Aging Bucket</label>
-                <p className="text-gray-900">{patient.aging_bucket || '-'}</p>
-              </div>
+
+              <Field label="Patient Account #" value={patient.patient_account_number || '-'} mono icon={<FiHash className="text-primary" size={14} />} />
+              <Field label="Phone Number" value={patient.phone_number || '-'} mono icon={<FiPhone className="text-primary" size={14} />} />
+              <Field label="Aging Bucket" value={patient.aging_bucket || '-'} icon={<FiClock className="text-primary" size={14} />} />
             </div>
-          </section>
+          </Section>
 
           {/* Provider Information */}
           {patient.provider_name && (
-            <section className="bg-gray-50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <FiUser className="text-teal-600" />
-                Provider Information
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Provider Name</label>
-                  <p className="text-gray-900">{patient.provider_name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Appointment Date & Time</label>
-                  <p className="text-gray-900">{formatDateTime(patient.appointment_date_time)}</p>
-                </div>
+            <Section title="Provider Information" icon={<FiUser className="text-white" size={18} />}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Provider Name" value={patient.provider_name} icon={<FiUser className="text-primary" size={14} />} />
+                <Field label="Appointment Date & Time" value={formatDateTime(patient.appointment_date_time)} icon={<FiCalendar className="text-primary" size={14} />} />
               </div>
-            </section>
+            </Section>
           )}
 
           {/* Insurance Information */}
           {(patient.insurance || patient.network_status || patient.eligibility_status) && (
-            <section className="bg-gray-50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <FiShield className="text-teal-600" />
-                Insurance Information
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {patient.insurance && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Insurance</label>
-                    <p className="text-gray-900">{patient.insurance}</p>
-                  </div>
-                )}
+            <Section title="Insurance Information" icon={<FiShield className="text-white" size={18} />}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {patient.insurance && <Field label="Insurance" value={patient.insurance} icon={<FiShield className="text-primary" size={14} />} />}
+
                 {patient.network_status && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Network Status</label>
-                    <p className="text-gray-900">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        patient.network_status === 'In Network' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {patient.network_status}
-                      </span>
-                    </p>
+                  <div className="flex items-start gap-3 p-3 bg-white/30 rounded-xl border border-white/40 backdrop-blur-sm">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <FiShield className="text-primary" size={14} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-foreground  tracking-wide mb-1">Network Status</p>
+                      <Badge value={patient.network_status} variant={patient.network_status === 'In Network' ? 'success' : 'warning'} />
+                    </div>
                   </div>
                 )}
+
                 {patient.eligibility_status && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Eligibility Status</label>
-                    <p className="text-gray-900">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        patient.eligibility_status === 'Active' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {patient.eligibility_status}
-                      </span>
-                    </p>
+                  <div className="flex items-start gap-3 p-3 bg-white/30 rounded-xl border border-white/40 backdrop-blur-sm">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <FiCheck className="text-primary" size={14} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-foreground  tracking-wide mb-1">Eligibility Status</p>
+                      <Badge value={patient.eligibility_status} variant={patient.eligibility_status === 'Active' ? 'success' : 'error'} />
+                    </div>
                   </div>
                 )}
-                {patient.anticipated_cpt_code && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Anticipated CPT Code</label>
-                    <p className="text-gray-900 font-mono">{patient.anticipated_cpt_code}</p>
-                  </div>
-                )}
+
+                {patient.anticipated_cpt_code && <Field label="Anticipated CPT Code" value={patient.anticipated_cpt_code} mono icon={<FiFileText className="text-primary" size={14} />} />}
+
                 {patient.preventive_services_covered && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Preventive Services Covered</label>
-                    <p className="text-gray-900">
-                      <span className={`px-2 py-1 rounded text-xs ${
-                        patient.preventive_services_covered.toLowerCase() === 'yes' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {patient.preventive_services_covered}
-                      </span>
-                    </p>
+                  <div className="flex items-start gap-3 p-3 bg-white/30 rounded-xl border border-white/40 backdrop-blur-sm">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <FiShield className="text-primary" size={14} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-foreground  tracking-wide mb-1">Preventive Services</p>
+                      <Badge value={patient.preventive_services_covered} variant={patient.preventive_services_covered.toLowerCase() === 'yes' ? 'success' : 'neutral'} />
+                    </div>
                   </div>
                 )}
-                {patient.pcp_details && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">PCP Details (HMO Plan)</label>
-                    <p className="text-gray-900">{patient.pcp_details}</p>
-                  </div>
-                )}
+
+                {patient.pcp_details && <Field label="PCP Details (HMO Plan)" value={patient.pcp_details} icon={<FiUser className="text-primary" size={14} />} />}
               </div>
-            </section>
+            </Section>
           )}
 
           {/* Coverage Details */}
-          {(patient.family_deductible || patient.family_deductible_remaining || patient.copay || 
-            patient.coinsurance || patient.coverage_notes || patient.coverage_effective_from || 
-            patient.coverage_effective_to) && (
-            <section className="bg-gray-50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <FiShield className="text-teal-600" />
-                Coverage Details
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                {patient.family_deductible && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Family Deductible</label>
-                    <p className="text-gray-900">{formatCurrency(patient.family_deductible)}</p>
-                  </div>
-                )}
-                {patient.family_deductible_remaining && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Family Deductible Remaining</label>
-                    <p className="text-gray-900">{formatCurrency(patient.family_deductible_remaining)}</p>
-                  </div>
-                )}
-                {patient.individual_oop_max && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Individual OOP Max</label>
-                    <p className="text-gray-900">{formatCurrency(patient.individual_oop_max)}</p>
-                  </div>
-                )}
-                {patient.individual_oop_remaining && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Individual OOP Remaining</label>
-                    <p className="text-gray-900">{formatCurrency(patient.individual_oop_remaining)}</p>
-                  </div>
-                )}
-                {patient.copay && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Copay</label>
-                    <p className="text-gray-900">{formatCurrency(patient.copay)}</p>
-                  </div>
-                )}
-                {patient.coinsurance && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Coinsurance</label>
-                    <p className="text-gray-900">{patient.coinsurance}</p>
-                  </div>
-                )}
-                {patient.coverage_effective_from && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Coverage Effective From</label>
-                    <p className="text-gray-900">{formatDate(patient.coverage_effective_from)}</p>
-                  </div>
-                )}
-                {patient.coverage_effective_to && (
-                  <div>
-                    <label className="text-sm font-medium text-gray-600">Coverage Effective To</label>
-                    <p className="text-gray-900">
-                      {patient.coverage_effective_to ? formatDate(patient.coverage_effective_to) : 'Present'}
-                    </p>
-                  </div>
-                )}
+          {(patient.family_deductible || patient.copay || patient.coinsurance || patient.coverage_notes) && (
+            <Section title="Coverage Details" icon={<FiDollarSign className="text-white" size={18} />}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {patient.family_deductible && <Field label="Family Deductible" value={formatCurrency(patient.family_deductible)} icon={<FiDollarSign className="text-primary" size={14} />} />}
+                {patient.family_deductible_remaining && <Field label="Deductible Remaining" value={formatCurrency(patient.family_deductible_remaining)} icon={<FiDollarSign className="text-primary" size={14} />} />}
+                {patient.individual_oop_max && <Field label="Individual OOP Max" value={formatCurrency(patient.individual_oop_max)} icon={<FiDollarSign className="text-primary" size={14} />} />}
+                {patient.individual_oop_remaining && <Field label="OOP Remaining" value={formatCurrency(patient.individual_oop_remaining)} icon={<FiDollarSign className="text-primary" size={14} />} />}
+                {patient.copay && <Field label="Copay" value={formatCurrency(patient.copay)} icon={<FiDollarSign className="text-primary" size={14} />} />}
+                {patient.coinsurance && <Field label="Coinsurance" value={patient.coinsurance} icon={<FiDollarSign className="text-primary" size={14} />} />}
+                {patient.coverage_effective_from && <Field label="Coverage Effective From" value={formatDate(patient.coverage_effective_from)} icon={<FiCalendar className="text-primary" size={14} />} />}
+                {patient.coverage_effective_to && <Field label="Coverage Effective To" value={patient.coverage_effective_to ? formatDate(patient.coverage_effective_to) : 'Present'} icon={<FiCalendar className="text-primary" size={14} />} />}
               </div>
+
               {patient.coverage_notes && (
-                <div>
-                  <label className="text-sm font-medium text-gray-600">Coverage Notes</label>
-                  <div className="mt-2 p-3 bg-white rounded border border-gray-200">
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{patient.coverage_notes}</p>
-                  </div>
+                <div className="mt-3 p-4 bg-white/30 rounded-xl border border-white/40">
+                  <p className="text-xs font-medium text-foreground  tracking-wide mb-2">Coverage Notes</p>
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{patient.coverage_notes}</p>
                 </div>
               )}
-            </section>
+            </Section>
           )}
 
           {/* Comments */}
           {patient.comments && patient.comments.trim() && (
-            <section className="bg-gray-50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <FiFileText className="text-teal-600" />
-                Comments
-              </h3>
-              <div>
-                <label className="text-sm font-medium text-gray-600">Comments</label>
-                <div className="mt-2 p-3 bg-white rounded border border-gray-200">
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{patient.comments}</p>
-                </div>
+            <Section title="Comments" icon={<FiFileText className="text-white" size={18} />}>
+              <div className="p-4 bg-white/30 rounded-xl border border-white/40">
+                <p className="text-sm text-foreground whitespace-pre-wrap">{patient.comments}</p>
               </div>
-            </section>
+            </Section>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="sticky bottom-0 bg-gray-100 px-6 py-4 rounded-b-lg flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium"
-          >
-            Close
-          </button>
         </div>
       </div>
     </div>

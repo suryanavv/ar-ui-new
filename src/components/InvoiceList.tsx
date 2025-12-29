@@ -418,9 +418,10 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="text-sm text-foreground">Loading invoices...</div>
         </div>
       </div>
     );
@@ -461,9 +462,10 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
           </div>
           
           {loadingPatients ? (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <div className="text-sm text-foreground">Loading patients...</div>
               </div>
             </div>
           ) : (

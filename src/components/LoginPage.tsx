@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { FiMail, FiLock, FiAlertCircle } from 'react-icons/fi';
-import logo from '../assets/favicon-32x32.png';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import type { User } from '../types';
 
 interface LoginPageProps {
@@ -10,8 +12,10 @@ interface LoginPageProps {
 export const LoginPage = ({ onLogin }: LoginPageProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
 
   useEffect(() => {
@@ -26,8 +30,8 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setError(null);
+    setIsLoading(true);
 
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -45,140 +49,189 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
       }
 
       const data = await response.json();
-      
+
       // Store tokens in localStorage
       localStorage.setItem('access_token', data.access_token);
       localStorage.setItem('refresh_token', data.refresh_token);
       localStorage.setItem('user', JSON.stringify(data.user));
-      
+
       // Call parent callback
       onLogin(data.access_token, data.user);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Invalid email or password');
-    } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <>
-      {/* Session Expired Modal */}
-      {sessionExpired && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 animate-in fade-in zoom-in duration-200">
-            <div className="flex flex-col items-center text-center">
-              {/* Icon */}
-              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mb-4">
-                <FiAlertCircle className="text-amber-600" size={32} />
-              </div>
-              
-              {/* Title */}
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                Session Expired
-              </h2>
-              
-              {/* Message */}
-              <p className="text-gray-600 mb-6 leading-relaxed">
-                Your session has timed out due to inactivity. For your security, please log in again to continue using the dashboard.
-              </p>
-              
-              {/* Button */}
-              <button
-                onClick={() => setSessionExpired(false)}
-                className="w-full py-3 px-6 bg-teal-700 text-white rounded-xl font-semibold hover:bg-teal-800 transition-colors"
-              >
-                Continue to Login
-              </button>
-            </div>
+    <div className="min-h-screen flex">
+      {/* Left Panel - Hidden on mobile/tablet, visible on desktop */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-primary">
+        <div className="relative z-10 flex flex-col justify-between w-full px-8 xl:px-12 py-8 xl:py-12">
+          <div className="flex items-center gap-2">
+            <img src="/logo.svg" alt="EzMedTech Logo" className="w-8 h-8 object-contain" />
+            <h1 className="text-xl font-semibold">EZMedTech</h1>
           </div>
-        </div>
-      )}
 
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-teal-50 to-cyan-50">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          {/* Logo and Title */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <img src={logo} alt="EZ MEDTECH" className="h-16 w-16" />
-            </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Welcome Back
-            </h1>
-            <p className="text-gray-600">
-              Log in to access the AR Dashboard
+          <div className="flex-1 flex flex-col justify-center">
+            <h2 className="text-3xl xl:text-4xl mb-4 xl:mb-6 leading-tight">Effortlessly manage your medical practice.</h2>
+            <p className="text-base xl:text-lg leading-relaxed">
+              Manage Patients Information, Appointments, and more.
             </p>
           </div>
 
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start gap-3">
-              <FiAlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-          )}
+          <div className="flex justify-between items-center text-sm">
+            <span>© {new Date().getFullYear()} EZMedTech. All rights reserved.</span>
+            <span className="cursor-pointer hover:underline">Privacy Policy</span>
+          </div>
+        </div>
+      </div>
 
-          {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Input */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Email Address
-              </label>
-              <div className="relative">
-                <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
+      {/* Right Panel - Login Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-8 sm:px-6 sm:py-10 md:px-8 md:py-12 lg:p-8 bg-background min-h-screen liquid-glass-environment">
+        <div className="w-full max-w-[340px] sm:max-w-sm md:max-w-md mx-auto space-y-5 sm:space-y-6 md:space-y-8 p-5 sm:p-6 md:p-8 liquid-glass">
+          {/* Mobile/Tablet Logo - Hidden on desktop */}
+          <div className="lg:hidden text-center mb-4 sm:mb-6 md:mb-8">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <img src="/logo.svg" alt="EzMedTech Logo" className="w-7 h-7 sm:w-8 sm:h-8 object-contain" />
+              <h1 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground">EZMedtech</h1>
+            </div>
+          </div>
+
+          <div className="space-y-3 sm:space-y-4">
+            {/* Session Expired Modal */}
+            {sessionExpired && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-md">
+                <div className="liquid-glass rounded-2xl p-8 max-w-md w-full mx-4 animate-in fade-in zoom-in duration-200">
+                  <div className="flex flex-col items-center text-center">
+                    <div className="w-16 h-16 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-full flex items-center justify-center mb-4 border border-white/40">
+                      <AlertCircle className="text-foreground" size={32} />
+                    </div>
+
+                    <h2 className="text-2xl font-bold text-foreground mb-3">
+                      Session Expired
+                    </h2>
+
+                    <p className="text-foreground mb-6 leading-relaxed">
+                      Your session has timed out due to inactivity. For your security, please log in again to continue using the dashboard.
+                    </p>
+
+                    <button
+                      onClick={() => setSessionExpired(false)}
+                      className="w-full py-3 px-6 liquid-glass-btn-primary text-white rounded-xl font-semibold transition-all duration-200"
+                    >
+                      Continue to Login
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="text-center -mt-2 sm:-mt-3">
+              {/* <h2 className="text-xl sm:text-2xl text-foreground font-semibold">Login</h2> */}
+              {/* <p className="text-sm sm:text-base mt-1">Sign in to your account</p> */}
+            </div>
+
+            {/* Error Display */}
+            {error && (
+              <div className="flex items-center gap-2 p-2.5 sm:p-3 rounded-lg bg-gradient-to-r from-red-500/20 to-rose-500/20 border border-red-500/30 backdrop-blur-sm text-foreground">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span className="text-xs sm:text-sm">{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+              {/* Email Field */}
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="email" className="text-xs sm:text-sm font-medium text-foreground">
+                  Email
+                </Label>
+                <Input
+                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-teal-700 focus:outline-none transition-colors"
-                  placeholder="admin@ezmedtech.com"
+                  placeholder="Enter your email"
+                  className="liquid-glass-input h-10 sm:h-9 text-sm text-foreground placeholder:text-foreground/50"
                   required
                 />
               </div>
-            </div>
 
-            {/* Password Input */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-teal-700 focus:outline-none transition-colors"
-                  placeholder="Enter your password"
-                  required
-                />
+              {/* Password Field */}
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="password" className="text-xs sm:text-sm font-medium text-foreground">
+                  Password
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="pr-10 liquid-glass-input h-10 sm:h-9 text-sm text-foreground placeholder:text-foreground/50"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full cursor-pointer px-3 text-foreground hover:bg-white/20"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 sm:h-3 sm:w-3" />
+                    ) : (
+                      <Eye className="h-4 w-4 sm:h-3 sm:w-3" />
+                    )}
+                  </Button>
+                </div>
               </div>
-            </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className={`w-full py-3 px-4 bg-teal-700 text-white rounded-xl font-semibold transition-all ${
-                loading
-                  ? 'opacity-60 cursor-not-allowed'
-                  : 'hover:bg-teal-800 hover:shadow-lg hover:-translate-y-0.5'
-              }`}
-            >
-              {loading ?'Logging in...' : 'Log In'}
-            </button>
-          </form>
+              {/* Remember me and Forgot password */}
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="remember"
+                    checked={rememberMe}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setRememberMe(checked);
+                    }}
+                    className="rounded border-white/40 cursor-pointer w-4 h-4 accent-primary"
+                  />
+                  <Label htmlFor="remember" className="text-xs sm:text-sm cursor-pointer text-foreground">
+                    Remember me
+                  </Label>
+                </div>
+                {/* <span className="text-xs sm:text-sm text-foreground cursor-pointer hover:underline">
+                  Forgot password?
+                </span> */}
+              </div>
 
-          {/* Demo Credentials */}
-          {/* <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <p className="text-xs font-semibold text-blue-900 mb-2">Demo Credentials:</p>
-            <p className="text-xs text-blue-700">Email: admin@ezmedtech.com</p>
-            <p className="text-xs text-blue-700">Password: Admin123!</p>
-          </div> */}
+              {/* Login Button */}
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full liquid-glass-btn-primary h-11 sm:h-10 text-sm sm:text-base font-semibold"
+              >
+                {isLoading ? (
+                  <>
+                    <span>Logging in...</span>
+                    <div className="ml-2 w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                  </>
+                ) : (
+                  <>
+                    <span>Login</span>
+                    <span className="text-lg ml-2">→</span>
+                  </>
+                )}
+              </Button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
-    </>
   );
 };

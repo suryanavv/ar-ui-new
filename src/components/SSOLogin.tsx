@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { FiAlertCircle, FiLoader } from 'react-icons/fi';
-import logo from '../assets/favicon-32x32.png';
+import { AlertCircle, Loader2 } from 'lucide-react';
+import { Button } from './ui/button';
 import type { User } from '../types';
 
 interface SSOLoginProps {
@@ -72,55 +72,59 @@ export const SSOLogin = ({ onLogin }: SSOLoginProps) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-teal-50 to-cyan-50">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+    <div className="min-h-screen flex items-center justify-center bg-[#d4d7e9] liquid-glass-environment px-4 py-8">
+      <div className="w-full max-w-md mx-auto">
+        <div className="liquid-glass p-8 sm:p-10 md:p-12 rounded-2xl space-y-6 sm:space-y-8">
           {/* Logo */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <img src={logo} alt="EZ MEDTECH" className="h-16 w-16" />
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <img src="/logo.svg" alt="EzMedTech Logo" className="w-8 h-8 object-contain" />
+              <h1 className="text-2xl sm:text-3xl font-semibold text-foreground">EZMedTech</h1>
             </div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              SSO Authentication
-            </h1>
+            <h2 className="text-xl sm:text-2xl text-foreground font-semibold mb-2">SSO Authentication</h2>
+            <p className="text-sm sm:text-base text-foreground/70">Signing you in securely...</p>
           </div>
 
           {/* Loading State */}
           {loading && (
             <div className="text-center py-8">
               <div className="flex justify-center mb-4">
-                <FiLoader className="animate-spin text-teal-700" size={48} />
+                <Loader2 className="animate-spin text-primary" size={48} />
               </div>
-              <p className="text-gray-600 text-lg">
+              <p className="text-foreground text-lg">
                 Authenticating via SSO...
+              </p>
+              <p className="text-foreground/60 text-sm mt-2">
+                Please wait while we verify your credentials
               </p>
             </div>
           )}
 
           {/* Error State */}
           {!loading && error && (
-            <>
-              <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start gap-3">
-                <FiAlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
-                <p className="text-sm text-red-800">{error}</p>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 p-3 sm:p-4 rounded-lg bg-gradient-to-r from-red-500/20 to-rose-500/20 border border-red-500/30 backdrop-blur-sm text-foreground">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <span className="text-sm sm:text-base">{error}</span>
               </div>
 
               {/* Action Buttons */}
               <div className="space-y-3">
-                <button
+                <Button
                   onClick={handleRetry}
-                  className="w-full py-3 px-4 bg-teal-700 text-white rounded-xl font-semibold transition-all hover:bg-teal-800 hover:shadow-lg hover:-translate-y-0.5"
+                  className="w-full liquid-glass-btn-primary h-11 text-base font-semibold"
                 >
                   Retry
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleGoToLogin}
-                  className="w-full py-3 px-4 bg-gray-100 text-gray-700 rounded-xl font-semibold transition-all hover:bg-gray-200 hover:shadow-lg hover:-translate-y-0.5"
+                  variant="outline"
+                  className="w-full h-11 text-base font-semibold"
                 >
                   Go to Login Page
-                </button>
+                </Button>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

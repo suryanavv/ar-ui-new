@@ -13,3 +13,4 @@ export { InvoiceList } from './InvoiceList';
 export { UserManagement } from './UserManagement';
 export { UploadSection } from './UploadSection';
 export { ToastContainer, useToast } from './Toast';
+export { NotFoundPage } from './NotFoundPage';

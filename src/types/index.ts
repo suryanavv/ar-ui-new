@@ -9,6 +9,16 @@ export interface User {
   payment_provider_guid?: string; // Payment provider GUID from SSO token
 }
 
+export interface Appointment {
+  id: number;
+  appointment_date: string;
+  appointment_date_display: string;
+  billed_fee: string;
+  insurance_covered: string;
+  balance: string;
+  insurance_company: string;
+}
+
 export interface Patient {
   id?: number; // Invoice ID
   phone_number: string;
@@ -25,6 +35,9 @@ export interface Patient {
   estimated_date?: string;
   call_status?: string;
   call_count?: number;
+  appointment_count?: number; // Number of appointments
+  appointments?: Appointment[]; // Detailed appointment list
+  total_outstanding_amount?: string; // Total outstanding across all appointments
   last_called_at?: string;
   payment_status?: string; // pending, completed, failed, refunded
   amount_paid?: string; // Amount paid by patient
@@ -32,7 +45,9 @@ export interface Patient {
   last_3_attempts?: string[]; // Last 3 call attempts for hover tooltip
   // Additional fields for detailed view
   patient_dob?: string;
+  patient_dob_display?: string; // Formatted date of birth (MM/DD/YYYY)
   patient_account_number?: string;
+  primary_insurance_company?: string; // Insurance company from primary appointment
   provider_name?: string;
   appointment_date_time?: string;
   insurance?: string;

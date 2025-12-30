@@ -61,10 +61,16 @@ const ToastItem = ({ toast, onRemove }: ToastItemProps) => {
     };
   }, [toast.id, onRemove]);
 
-  const styles = {
-    success: 'bg-green-50 border-green-200 text-green-800',
-    error: 'bg-red-50 border-red-200 text-red-800',
-    info: 'bg-blue-50 border-blue-200 text-blue-800',
+  const iconColors = {
+    success: 'text-green-500',
+    error: 'text-red-500',
+    info: 'text-primary',
+  };
+
+  const borderColors = {
+    success: 'border-l-4 border-green-500',
+    error: 'border-l-4 border-red-500',
+    info: 'border-l-4 border-primary',
   };
 
   const icons = {
@@ -77,13 +83,13 @@ const ToastItem = ({ toast, onRemove }: ToastItemProps) => {
 
   return (
     <div
-      className={`flex items-start gap-3 p-4 rounded-xl shadow-lg border-2 transition-all duration-300 ${
-        styles[toast.type]
-      } ${isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full'}`}
+      className={`liquid-glass flex items-start gap-3 p-4 rounded-xl transition-all duration-300 ${borderColors[toast.type]} ${
+        isVisible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-full'
+      }`}
     >
-      <Icon className="flex-shrink-0 mt-0.5" size={20} />
+      <Icon className={`flex-shrink-0 mt-0.5 ${iconColors[toast.type]}`} size={20} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium break-words">{toast.message}</p>
+        <p className="text-sm font-medium break-words text-foreground">{toast.message}</p>
       </div>
       <button
         onClick={() => {
@@ -99,7 +105,7 @@ const ToastItem = ({ toast, onRemove }: ToastItemProps) => {
           }
           setTimeout(() => onRemove(toast.id), 300);
         }}
-        className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+        className="flex-shrink-0 text-foreground/60 hover:text-foreground transition-colors rounded-full hover:bg-white/10 p-1"
       >
         <FiX size={18} />
       </button>

@@ -21,25 +21,25 @@ import {
 const navItems = [
   {
     title: "Dashboard",
-    url: "#",
+    url: "/dashboard",
     icon: "IconDashboard",
     page: "dashboard"
   },
   {
     title: "AR Operations",
-    url: "#",
+    url: "/ar-operations",
     icon: "IconFileUpload",
     page: "ar-operations"
   },
   {
     title: "Invoice List",
-    url: "#",
+    url: "/invoice-list",
     icon: "IconFileText",
     page: "invoice-list"
   },
   {
     title: "Patients",
-    url: "#",
+    url: "/patients",
     icon: "IconUsers",
     page: "patients"
   },

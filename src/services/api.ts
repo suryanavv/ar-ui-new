@@ -58,10 +58,10 @@ api.interceptors.response.use(
       // Check if refresh token exists
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) {
-        // No refresh token available - redirect to login
+        // No refresh token available - dispatch session expired event
         localStorage.removeItem('access_token');
         localStorage.removeItem('user');
-        window.location.href = '/?session_expired=true';
+        window.dispatchEvent(new CustomEvent('session-expired'));
         return Promise.reject(error);
       }
 
@@ -114,7 +114,7 @@ api.interceptors.response.use(
         return api(originalRequest);
         
       } catch (refreshError) {
-        // Refresh token failed - clear everything and redirect to login
+        // Refresh token failed - clear everything and dispatch session expired event
         processQueue(refreshError, null);
         isRefreshing = false;
         
@@ -122,7 +122,7 @@ api.interceptors.response.use(
         localStorage.removeItem('refresh_token');
         localStorage.removeItem('user');
         
-        window.location.href = '/?session_expired=true';
+        window.dispatchEvent(new CustomEvent('session-expired'));
         return Promise.reject(refreshError);
       }
     }

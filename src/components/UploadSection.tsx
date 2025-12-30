@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { FileSelectorDropdown, PatientTable, ConfirmModal } from './';
+import { AppointmentsModal } from './AppointmentsModal';
 import { Button } from './ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import type { Patient } from '../types';
@@ -66,6 +67,7 @@ export const UploadSection = ({
   const [showSelectedCallModal, setShowSelectedCallModal] = useState(false);
   const [downloadingARTesting, setDownloadingARTesting] = useState(false);
   const [downloadingSelected, setDownloadingSelected] = useState(false);
+  const [appointmentsPatient, setAppointmentsPatient] = useState<Patient | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // File upload handlers
   const validateFile = (file: File): boolean => {
@@ -328,7 +330,7 @@ export const UploadSection = ({
                 placeholder="Search by patient name or phone..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 px-3 py-2 text-sm liquid-glass-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="flex-1 h-9 px-3 text-sm liquid-glass-input !rounded-full focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
             </div>
 
@@ -337,7 +339,7 @@ export const UploadSection = ({
               <IconFilter className="w-4 h-4 flex-shrink-0" />
               <span className="text-sm font-medium whitespace-nowrap hidden sm:inline">Filter by:</span>
               <Select value={callStatusFilter} onValueChange={(value) => setCallStatusFilter(value as CallStatusFilter)}>
-                <SelectTrigger className="w-48 liquid-glass-input border-white/30">
+                <SelectTrigger className="w-48 liquid-glass-input border-white/30 !rounded-full">
                   <SelectValue placeholder="Select filter" />
                 </SelectTrigger>
                 <SelectContent>
@@ -357,7 +359,7 @@ export const UploadSection = ({
             {/* Call-related buttons on the left */}
             <div className="flex flex-wrap gap-2">
               <Button
-                className="neumorphic-button-primary"
+                className="liquid-glass-btn-primary"
                 onClick={() => onBatchCall()}
                 disabled={patients.length === 0 || callingInProgress}
               >
@@ -367,7 +369,7 @@ export const UploadSection = ({
 
               {selectedPatientIds.size > 0 && (
                 <Button
-                  className="neumorphic-button-primary text-sm"
+                  className="liquid-glass-btn-primary text-sm"
                   onClick={() => setShowSelectedCallModal(true)}
                   disabled={callingInProgress}
                 >
@@ -387,7 +389,7 @@ export const UploadSection = ({
 
               {filteredPatients.length > 0 && (callStatusFilter !== 'all' || searchTerm.trim()) && selectedPatientIds.size === 0 && (
                 <Button
-                  className="neumorphic-button-primary text-sm"
+                  className="liquid-glass-btn-primary text-sm"
                   onClick={() => setShowBatchCallModal(true)}
                   disabled={callingInProgress}
                 >
@@ -411,7 +413,7 @@ export const UploadSection = ({
               {/* Export AR Testing CSV button - Only show when a specific file is selected (not All Patients) */}
               {selectedUploadId && patients.length > 0 && (
                 <Button
-                  className="neumorphic-button-primary"
+                  className="liquid-glass-btn-primary"
                   onClick={handleExportARTesting}
                   disabled={downloadingARTesting}
                   title="Export AR Testing format CSV"
@@ -433,7 +435,7 @@ export const UploadSection = ({
               {/* Export Selected Button */}
               {filteredPatients.length > 0 && (searchTerm.trim() || callStatusFilter !== 'all') && (
                 <Button
-                  className="neumorphic-button-primary text-sm"
+                  className="liquid-glass-btn-primary text-sm"
                   onClick={handleExportSelected}
                   disabled={downloadingSelected || filteredPatients.length === 0}
                   title="Export filtered/selected patients as CSV"
@@ -446,7 +448,7 @@ export const UploadSection = ({
               {/* Export Results Button */}
               {patients.length > 0 && (
                 <Button
-                  className="neumorphic-button-primary text-sm"
+                  className="liquid-glass-btn-primary text-sm"
                   onClick={async () => {
                     if (patients.length === 0) return;
 
@@ -542,6 +544,7 @@ export const UploadSection = ({
         onEndCall={onEndCall}
         onViewCallHistory={onViewCallHistory}
         onViewDetails={onViewDetails}
+        onViewAppointments={(patient) => setAppointmentsPatient(patient)}
         onUpdatePatient={handleUpdatePatient}
         activeCalls={activeCalls}
         selectedPatientIds={selectedPatientIds}
@@ -580,6 +583,15 @@ export const UploadSection = ({
         }}
         onCancel={() => setShowBatchCallModal(false)}
       />
+
+      {/* Appointments Modal */}
+      {appointmentsPatient && (
+        <AppointmentsModal
+          patient={appointmentsPatient}
+          onClose={() => setAppointmentsPatient(null)}
+          isOpen={true}
+        />
+      )}
     </div>
   );
 };

@@ -1,5 +1,6 @@
 import { type Icon } from "@tabler/icons-react"
 import { useState, useEffect, useRef } from "react"
+import { Link, useLocation } from "react-router-dom"
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -22,13 +23,17 @@ export function NavMain({
   onPageChange?: (page: string) => void
   currentPage?: string
 }) {
+  const location = useLocation()
   const [activeTabRect, setActiveTabRect] = useState<{ top: number; height: number } | null>(null)
   const menuRefs = useRef<(HTMLLIElement | null)[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Determine active page from route
+  const activePage = currentPage || items.find(item => item.url === location.pathname)?.page || ''
+
   useEffect(() => {
-    if (currentPage) {
-      const activeIndex = items.findIndex(item => item.page === currentPage)
+    if (activePage) {
+      const activeIndex = items.findIndex(item => item.page === activePage)
       if (activeIndex !== -1 && menuRefs.current[activeIndex]) {
         const rect = menuRefs.current[activeIndex]?.getBoundingClientRect()
         const containerRect = containerRef.current?.getBoundingClientRect()
@@ -40,7 +45,7 @@ export function NavMain({
         }
       }
     }
-  }, [currentPage, items])
+  }, [activePage, items])
 
   return (
     <SidebarGroup>
@@ -50,12 +55,17 @@ export function NavMain({
             <SidebarMenuItem key={item.title} ref={(el) => { menuRefs.current[index] = el; }}>
               <SidebarMenuButton
                 tooltip={item.title}
-                onClick={() => item.page && onPageChange?.(item.page)}
-                isActive={currentPage === item.page}
+                asChild
+                isActive={activePage === item.page}
                 className="transition-colors"
               >
-                {item.icon && <item.icon className="shrink-0" />}
-                <span className="font-medium">{item.title}</span>
+                <Link 
+                  to={item.url}
+                  onClick={() => item.page && onPageChange?.(item.page)}
+                >
+                  {item.icon && <item.icon className="shrink-0" />}
+                  <span className="font-medium">{item.title}</span>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}

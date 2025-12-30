@@ -1,5 +1,5 @@
 import type { Patient } from '../types';
-import { FiEye, FiPhone, FiPhoneOff, FiUser, FiEdit2, FiCheck, FiX } from 'react-icons/fi';
+import { FiEye, FiPhone, FiPhoneOff, FiUser, FiEdit2, FiCheck, FiX, FiClock } from 'react-icons/fi';
 import {
   IconSortAscending,
   IconSortDescending,
@@ -8,7 +8,11 @@ import {
 import { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { parseNotes } from '../utils/notesParser';
+import { getCallHistory } from '../services/api';
+import { formatDateTime } from '../utils/timezone';
+import { getPatientCallKey } from '../utils/patientUtils';
 
 interface PatientTableProps {
   patients: Patient[];
@@ -18,6 +22,7 @@ interface PatientTableProps {
   onEndCall?: (patient: Patient) => void;
   onViewCallHistory?: (patient: Patient) => void;
   onViewDetails?: (patient: Patient) => void;
+  onViewAppointments?: (patient: Patient) => void;
   onUpdatePatient?: (invoiceId: number, updates: Record<string, string | number>) => Promise<void>;
   activeCalls?: Map<string, { timestamp: number; conversationId?: string; callSid?: string; twilioStatus?: string }>;
   selectedPatientIds?: Set<number>;
@@ -28,6 +33,154 @@ type SortColumn = 'name' | 'date';
 type SortDirection = 'asc' | 'desc';
 type SortConfig = { column: SortColumn; direction: SortDirection };
 
+// Call History Popover Component
+interface CallHistoryPopoverProps {
+  patient: Patient;
+  onViewAll: () => void;
+}
+
+const CallHistoryPopover = ({ patient, onViewAll }: CallHistoryPopoverProps) => {
+  const [recentCalls, setRecentCalls] = useState<Array<{
+    id: number;
+    called_at: string | null;
+    call_status: string;
+    notes: string;
+  }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (open && patient.phone_number && (patient.call_count || 0) > 0) {
+      loadRecentCalls();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, patient.phone_number]);
+
+  const loadRecentCalls = async () => {
+    // If there are no calls, don't bother loading history or showing a spinner
+    if (!patient.phone_number || (patient.call_count || 0) === 0) {
+      setRecentCalls([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const data = await getCallHistory(
+        patient.phone_number,
+        patient.invoice_number || undefined,
+        patient.patient_first_name,
+        patient.patient_last_name,
+        patient.patient_dob
+      );
+      // Get first 2 calls (or 1 if only 1 exists)
+      setRecentCalls((data.calls || []).slice(0, 2));
+    } catch (err) {
+      console.error('Failed to load recent calls:', err);
+      setRecentCalls([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return 'bg-green-500/20 text-green-600';
+      case 'received':
+        return 'bg-blue-500/20 text-blue-600';
+      case 'failed':
+        return 'bg-red-500/20 text-red-600';
+      default:
+        return 'bg-yellow-500/20 text-yellow-600';
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <div
+        className="inline-block"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+      >
+        <PopoverTrigger asChild>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onViewAll();
+            }}
+            className="font-semibold text-primary hover:text-primary/80 hover:underline transition-colors cursor-pointer"
+          >
+            {patient.call_count || 0}
+          </button>
+        </PopoverTrigger>
+      </div>
+      <PopoverContent
+        className="w-80 p-0 liquid-glass-strong border-white/20"
+        onClick={(e) => e.stopPropagation()}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+      >
+        <div className="p-4 space-y-3">
+          <div className="flex items-center justify-between border-b border-white/20 pb-2">
+            <h3 className="text-sm font-semibold text-foreground">Recent Calls</h3>
+            <span className="text-xs text-muted-foreground">{patient.call_count || 0} total</span>
+          </div>
+
+          {loading ? (
+            <div className="text-center py-4">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mx-auto"></div>
+              <p className="text-xs text-muted-foreground mt-2">Loading...</p>
+            </div>
+          ) : recentCalls.length === 0 ? (
+            <div className="text-center py-4">
+              <p className="text-xs text-muted-foreground">
+                {(patient.call_count || 0) === 0 ? 'No call history yet' : 'No recent calls'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {recentCalls.map((call, index) => (
+                <div key={call.id} className="liquid-glass rounded-lg p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-foreground">Attempt {recentCalls.length - index}</span>
+                    <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${getStatusColor(call.call_status)}`}>
+                      {call.call_status}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <FiClock className="text-primary" size={12} />
+                    <span className="text-xs text-foreground/70">{formatDateTime(call.called_at)}</span>
+                  </div>
+                  {call.notes && (
+                    <p className="text-xs text-foreground/80 line-clamp-2">{call.notes}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {(patient.call_count || 0) > 0 && (
+            <Button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setOpen(false);
+                onViewAll();
+              }}
+              className="w-full liquid-glass-btn-primary text-xs py-1.5"
+            >
+              View All
+            </Button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 export const PatientTable = ({
   patients,
   loading,
@@ -36,6 +189,7 @@ export const PatientTable = ({
   onEndCall,
   onViewCallHistory,
   onViewDetails,
+  onViewAppointments,
   onUpdatePatient,
   activeCalls = new Map(),
   selectedPatientIds = new Set(),
@@ -46,6 +200,34 @@ export const PatientTable = ({
   const [editValue, setEditValue] = useState<string>('');
   const [updating, setUpdating] = useState(false);
   const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
+
+  // Refs for synchronized horizontal scrolling
+  const headerScrollRef = useRef<HTMLDivElement>(null);
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
+  const isScrollingSyncRef = useRef(false);
+
+  // Sync scroll handlers
+  const handleHeaderScroll = () => {
+    if (isScrollingSyncRef.current) return;
+    if (headerScrollRef.current && bodyScrollRef.current) {
+      isScrollingSyncRef.current = true;
+      bodyScrollRef.current.scrollLeft = headerScrollRef.current.scrollLeft;
+      requestAnimationFrame(() => {
+        isScrollingSyncRef.current = false;
+      });
+    }
+  };
+
+  const handleBodyScroll = () => {
+    if (isScrollingSyncRef.current) return;
+    if (headerScrollRef.current && bodyScrollRef.current) {
+      isScrollingSyncRef.current = true;
+      headerScrollRef.current.scrollLeft = bodyScrollRef.current.scrollLeft;
+      requestAnimationFrame(() => {
+        isScrollingSyncRef.current = false;
+      });
+    }
+  };
 
   // Helper function to get full name
   const getFullName = (patient: Patient): string => {
@@ -69,19 +251,6 @@ export const PatientTable = ({
       currency: 'USD',
       minimumFractionDigits: 2
     }).format(numAmount);
-  };
-
-  // Format date string
-  const formatDateString = (dateString: string): string => {
-    if (!dateString) return '-';
-    const parts = dateString.split('-');
-    if (parts.length !== 3) return dateString;
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10);
-    const day = parseInt(parts[2], 10);
-    if (isNaN(year) || isNaN(month) || isNaN(day)) return dateString;
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${monthNames[month - 1]} ${day}, ${year}`;
   };
 
   // Check if patient is paid
@@ -158,7 +327,7 @@ export const PatientTable = ({
     }
   };
 
-  // Editable cell component with neumorphic styling
+  // Editable cell component with liquid glass styling
   const EditableCell = ({
     patient,
     field,
@@ -191,7 +360,7 @@ export const PatientTable = ({
                   handleCancelEdit();
                 }
               }}
-              className="flex-1 min-w-0 px-1.5 py-0.5 text-xs neumorphic-inset rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              className="flex-1 min-w-0 px-1.5 py-0.5 text-xs liquid-glass-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               autoFocus
               disabled={updating}
             />
@@ -219,10 +388,10 @@ export const PatientTable = ({
     }
 
     return (
-      <td className={`${className} group relative`}>
-        <div className="flex items-center gap-1">
+      <td className={`${className} group relative overflow-hidden`}>
+        <div className="flex items-center gap-1 min-w-0">
           <div
-            className="flex-1"
+            className="flex-1 min-w-0 overflow-hidden"
             onClick={(e) => {
               if ((e.target as HTMLElement).tagName === 'BUTTON') {
                 return;
@@ -248,14 +417,6 @@ export const PatientTable = ({
   };
 
   // Check if call is currently active
-  const getPatientCallKey = (patient: Patient): string => {
-    const phone = patient.phone_number || '';
-    const invoice = patient.invoice_number || '';
-    const firstName = patient.patient_first_name || '';
-    const lastName = patient.patient_last_name || '';
-    return `${phone}|${invoice}|${firstName}|${lastName}`;
-  };
-
   const isCallActive = (patient: Patient): boolean => {
     const callKey = getPatientCallKey(patient);
     if (!callKey || !activeCalls.has(callKey)) return false;
@@ -479,150 +640,131 @@ export const PatientTable = ({
       <div className="absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-white/25 via-white/10 to-transparent rounded-t-xl pointer-events-none" />
 
       <div className="overflow-hidden rounded-xl flex-1 flex flex-col relative z-10">
-        {/* Fixed Header Table */}
-        <table className="w-full text-sm table-fixed">
-          <colgroup>
-            <col className="w-[3%]" />
-            <col className="w-[12%]" />
-            <col className="w-[12%]" />
-            <col className="w-[10%]" />
-            <col className="w-[7%]" />
-            <col className="w-[8%]" />
-            <col className="w-[6%]" />
-            <col className="w-[6%]" />
-            <col className="w-[7%]" />
-            <col className="w-[5%]" />
-            <col className="w-[14%]" />
-            <col className="w-[10%]" />
-          </colgroup>
-          <thead className="bg-[#9a8ea2]">
-            <tr>
-              {/* Checkbox */}
-              <th className="text-center font-semibold py-2 px-1 text-foreground text-sm">
-                {onSelectionChange && (
-                  <input
-                    type="checkbox"
-                    ref={selectAllCheckboxRef}
-                    checked={allVisibleSelected}
-                    onChange={handleSelectAll}
-                    className="w-3 h-3 text-primary border-muted rounded focus:ring-primary cursor-pointer"
-                    title={allVisibleSelected ? "Deselect all" : someVisibleSelected ? "Some selected" : "Select all"}
-                  />
-                )}
-              </th>
-
-              {/* Patient Name with Sort */}
-              <th className="text-left font-semibold py-2 px-2 text-foreground text-sm">
-                <div className="flex items-center gap-1 group">
-                  <span>Patient Name</span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => toggleSort('name')}
-                          className="focus:outline-none"
-                        >
-                          {getSortState('name').active && getSortState('name').direction === 'asc' ? (
-                            <IconSortAscending className="w-3 h-3 text-primary" />
-                          ) : getSortState('name').active && getSortState('name').direction === 'desc' ? (
-                            <IconSortDescending className="w-3 h-3 text-primary" />
-                          ) : (
-                            <IconArrowsSort className="w-3 h-3 text-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          )}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        {getSortState('name').active
-                          ? (getSortState('name').direction === 'asc' ? 'Sort Z to A' : 'Sort A to Z')
-                          : 'Sort A to Z'
-                        }
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-              </th>
-
-              {/* Phone Number */}
-              <th className="text-left font-semibold py-2 px-2 text-foreground text-sm">Phone</th>
-
-              {/* Invoice Date with Sort */}
-              <th className="text-left font-semibold py-2 px-2 text-foreground text-sm">
-                <div className="flex items-center gap-1 group">
-                  <span>Date</span>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => toggleSort('date')}
-                          className="focus:outline-none"
-                        >
-                          {getSortState('date').active && getSortState('date').direction === 'asc' ? (
-                            <IconSortAscending className="w-3 h-3 text-primary" />
-                          ) : getSortState('date').active && getSortState('date').direction === 'desc' ? (
-                            <IconSortDescending className="w-3 h-3 text-primary" />
-                          ) : (
-                            <IconArrowsSort className="w-3 h-3 text-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
-                          )}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top">
-                        {getSortState('date').active
-                          ? (getSortState('date').direction === 'asc' ? 'Sort Newest First' : 'Sort Oldest First')
-                          : 'Sort Oldest First'
-                        }
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-              </th>
-
-              {/* Amount */}
-              <th className="text-left font-semibold py-2 px-2 text-foreground text-sm">Amount</th>
-
-              {/* Outstanding */}
-              <th className="text-left font-semibold py-2 px-2 text-foreground text-sm">Outstanding</th>
-
-              {/* Link Req */}
-              <th className="text-center font-semibold py-2 px-1 text-foreground text-sm">Link Req</th>
-
-              {/* Link Sent */}
-              <th className="text-center font-semibold py-2 px-1 text-foreground text-sm">Link Sent</th>
-
-              {/* Call Status */}
-              <th className="text-center font-semibold py-2 px-1 text-foreground text-sm">Status</th>
-
-              {/* Calls */}
-              <th className="text-center font-semibold py-2 px-1 text-foreground text-sm">Calls</th>
-
-              {/* Recent Notes */}
-              <th className="text-left font-semibold py-2 px-2 text-foreground text-sm">Recent Notes</th>
-
-              {/* Actions */}
-              <th className="text-left font-semibold py-2 px-2 text-foreground text-sm">Actions</th>
-            </tr>
-          </thead>
-        </table>
-
-        {/* Scrollable Body Container */}
-        <div className="overflow-x-auto max-h-[70vh] overflow-y-auto flex-1 bg-white/80 rounded-lg">
-          <table className="w-full text-sm table-fixed">
+        {/* Header scroll container */}
+        <div ref={headerScrollRef} onScroll={handleHeaderScroll} className="overflow-x-auto">
+          {/* Header Table - not scrollable vertically */}
+          <table className="w-full text-sm min-w-[1000px]" style={{ tableLayout: 'fixed' }}>
             <colgroup>
-              <col className="w-[3%]" />
-              <col className="w-[12%]" />
-              <col className="w-[12%]" />
-              <col className="w-[10%]" />
-              <col className="w-[7%]" />
-              <col className="w-[8%]" />
-              <col className="w-[6%]" />
-              <col className="w-[6%]" />
-              <col className="w-[7%]" />
-              <col className="w-[5%]" />
-              <col className="w-[14%]" />
-              <col className="w-[10%]" />
+              <col style={{ width: onSelectionChange ? '2.5%' : '0%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '11%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '4%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '9%' }} />
+            </colgroup>
+            <thead className="bg-[#9a8ea2]">
+              <tr>
+                {/* Checkbox */}
+                <th
+                  className={`text-center font-semibold text-foreground text-sm ${onSelectionChange ? 'py-2 px-1' : 'p-0 w-0'
+                    }`}
+                >
+                  {onSelectionChange && (
+                    <input
+                      type="checkbox"
+                      ref={selectAllCheckboxRef}
+                      checked={allVisibleSelected}
+                      onChange={handleSelectAll}
+                      className="w-3 h-3 text-primary border-muted rounded focus:ring-primary cursor-pointer"
+                      title={allVisibleSelected ? "Deselect all" : someVisibleSelected ? "Some selected" : "Select all"}
+                    />
+                  )}
+                </th>
+
+                {/* Patient Name with Sort */}
+                <th className={`text-left font-semibold py-2 px-2 text-foreground text-sm overflow-hidden ${!onSelectionChange ? 'pl-4' : ''}`}>
+                  <div className="flex items-center gap-1 group">
+                    <span>Patient Name</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => toggleSort('name')}
+                            className="focus:outline-none"
+                          >
+                            {getSortState('name').active && getSortState('name').direction === 'asc' ? (
+                              <IconSortAscending className="w-3 h-3 text-primary" />
+                            ) : getSortState('name').active && getSortState('name').direction === 'desc' ? (
+                              <IconSortDescending className="w-3 h-3 text-primary" />
+                            ) : (
+                              <IconArrowsSort className="w-3 h-3 text-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          {getSortState('name').active
+                            ? (getSortState('name').direction === 'asc' ? 'Sort Z to A' : 'Sort A to Z')
+                            : 'Sort A to Z'
+                          }
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </th>
+
+                {/* Phone Number */}
+                <th className="text-left font-semibold py-2 px-2 text-foreground text-sm whitespace-nowrap truncate">Phone Number</th>
+
+                {/* Outstanding Balance */}
+                <th className="text-left font-semibold py-2 px-2 text-foreground text-sm">
+                  <div className="flex flex-col leading-tight">
+                    <span>Outstanding</span>
+                    <span>Balance</span>
+                  </div>
+                </th>
+
+                {/* Appointments */}
+                <th className="text-center font-semibold py-2 px-1 text-foreground text-sm whitespace-nowrap">Appointments</th>
+
+                {/* Link Req */}
+                <th className="text-center font-semibold py-2 px-1 text-foreground text-sm whitespace-nowrap">Link Req</th>
+
+                {/* Link Sent */}
+                <th className="text-center font-semibold py-2 px-1 text-foreground text-sm whitespace-nowrap">Link Sent</th>
+
+                {/* Est Date */}
+                <th className="text-left font-semibold py-2 px-2 text-foreground text-sm whitespace-nowrap">Est Date</th>
+
+                {/* Call Status */}
+                <th className="text-center font-semibold py-2 px-1 text-foreground text-sm whitespace-nowrap">Call Status</th>
+
+                {/* Calls */}
+                <th className="text-center font-semibold py-2 px-1 text-foreground text-sm whitespace-nowrap">Calls</th>
+
+                {/* Recent Notes */}
+                <th className="text-left font-semibold py-2 px-2 text-foreground text-sm whitespace-nowrap truncate">Recent Notes</th>
+
+                {/* Actions */}
+                <th className="text-left font-semibold py-2 px-2 text-foreground text-sm whitespace-nowrap">Actions</th>
+              </tr>
+            </thead>
+          </table>
+
+        </div>
+        {/* Scrollable Body Container - synced horizontal scroll with header */}
+        <div ref={bodyScrollRef} onScroll={handleBodyScroll} className="max-h-[70vh] overflow-auto flex-1 bg-white/80 rounded-lg">
+          <table className="w-full text-sm min-w-[1000px]" style={{ tableLayout: 'fixed' }}>
+            <colgroup>
+              <col style={{ width: onSelectionChange ? '2.5%' : '0%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '11%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '7%' }} />
+              <col style={{ width: '4%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '9%' }} />
             </colgroup>
             <tbody className="divide-y divide-[#9a8ea2]/30">
-
-
               {sortedPatients.map((patient, index) => {
                 const isMissing = hasMissingData(patient);
                 return (
@@ -631,8 +773,10 @@ export const PatientTable = ({
                     className={`bg-transparent hover:bg-white/10 transition-all duration-200 ${isMissing ? 'bg-red-500/5' : ''} ${selectedPatientIds.has(patient.id as number) ? 'bg-primary/10 border-l-2 border-l-primary' : ''}`}
                   >
                     {/* Checkbox */}
-                    <td className="py-2 px-1 text-center">
-
+                    <td
+                      className={`text-center ${onSelectionChange ? 'py-2 px-1' : 'p-0 w-0'
+                        }`}
+                    >
                       {onSelectionChange && patient.id !== undefined && (
                         <input
                           type="checkbox"
@@ -641,6 +785,7 @@ export const PatientTable = ({
                           className="w-3 h-3 text-primary border-muted rounded focus:ring-primary cursor-pointer"
                           onClick={(e) => e.stopPropagation()}
                         />
+
                       )}
                     </td>
 
@@ -670,7 +815,7 @@ export const PatientTable = ({
                           )}
                         </div>
                       }
-                      className="py-2 px-2"
+                      className={`py-2 px-2 break-words ${!onSelectionChange ? 'pl-4' : ''}`}
                     />
 
                     {/* Phone Number - Editable */}
@@ -687,25 +832,7 @@ export const PatientTable = ({
                       className="py-2 px-2"
                     />
 
-                    <td className="py-2 px-2 text-foreground">
-                      {patient.invoice_date ? formatDateString(patient.invoice_date) : '-'}
-                    </td>
-
-                    {/* Amount - Editable */}
-                    <EditableCell
-                      patient={patient}
-                      field="price"
-                      displayValue={
-                        patient.price ? (
-                          <span className="font-semibold">{formatCurrency(patient.price)}</span>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )
-                      }
-                      className="py-2 px-2"
-                    />
-
-                    {/* Outstanding - Editable */}
+                    {/* Outstanding Balance - Editable */}
                     <EditableCell
                       patient={patient}
                       field="outstanding_amount"
@@ -726,18 +853,28 @@ export const PatientTable = ({
                       className="py-2 px-2"
                     />
 
+                    {/* Appointments */}
+                    <td className="py-2 px-1 text-center">
+                      {onViewAppointments && (patient.appointment_count || 0) > 0 ? (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onViewAppointments(patient);
+                          }}
+                          className="font-semibold text-primary hover:text-primary/80 hover:underline transition-colors cursor-pointer"
+                        >
+                          {patient.appointment_count}
+                        </button>
+                      ) : (
+                        <span className="font-semibold">{patient.appointment_count || 0}</span>
+                      )}
+                    </td>
+
                     {/* Link Req */}
                     <td className="py-2 px-1 text-center">
-                      {patient.link_requested ? (
-                        patient.link_requested.toLowerCase() === 'yes' ? (
-                          <span className="text-green-600 text-base font-bold" title="Yes">✓</span>
-                        ) : patient.link_requested.toLowerCase() === 'no' ? (
-                          <span className="text-destructive text-base font-bold" title="No">✗</span>
-                        ) : (
-                          <span className="px-2 py-1 bg-sky-500/20 text-sky-700 backdrop-blur-sm border border-sky-500/30 rounded-full text-xs font-medium">
-                            {patient.link_requested}
-                          </span>
-                        )
+                      {patient.link_requested && patient.link_requested.toLowerCase() === 'yes' ? (
+                        <span className="text-green-600 text-base font-bold" title="Yes">✓</span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
@@ -745,16 +882,17 @@ export const PatientTable = ({
 
                     {/* Link Sent */}
                     <td className="py-2 px-1 text-center">
-                      {patient.link_sent ? (
-                        patient.link_sent.toLowerCase() === 'yes' ? (
-                          <span className="text-green-600 text-base font-bold" title="Yes">✓</span>
-                        ) : patient.link_sent.toLowerCase() === 'no' ? (
-                          <span className="text-destructive text-base font-bold" title="No">✗</span>
-                        ) : (
-                          <span className="px-2 py-1 bg-emerald-500/20 text-emerald-700 backdrop-blur-sm border border-emerald-500/30 rounded-full text-xs font-medium">
-                            {patient.link_sent}
-                          </span>
-                        )
+                      {patient.link_sent && patient.link_sent.toLowerCase() === 'yes' ? (
+                        <span className="text-green-600 text-base font-bold" title="Yes">✓</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </td>
+
+                    {/* Est Date */}
+                    <td className="py-2 px-2 text-foreground">
+                      {patient.estimated_date && patient.estimated_date.trim() ? (
+                        <span className="text-sm">{patient.estimated_date}</span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
@@ -780,23 +918,17 @@ export const PatientTable = ({
                     {/* Calls */}
                     <td className="py-2 px-1 text-center">
                       {onViewCallHistory ? (
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onViewCallHistory(patient);
-                          }}
-                          className="font-semibold hover:text-primary transition-colors"
-                        >
-                          {patient.call_count || 0}
-                        </button>
+                        <CallHistoryPopover
+                          patient={patient}
+                          onViewAll={() => onViewCallHistory(patient)}
+                        />
                       ) : (
                         <span className="font-semibold">{patient.call_count || 0}</span>
                       )}
                     </td>
 
                     {/* Recent Notes */}
-                    <td className="py-2 px-2">
+                    <td className="py-2 px-2 overflow-hidden">
                       {patient.recent_call_notes && patient.recent_call_notes.trim() ? (
                         <div className="group relative">
                           {(() => {
@@ -854,84 +986,99 @@ export const PatientTable = ({
                     </td>
 
                     {/* Actions */}
-                    <td className="py-2 px-2">
-                      <div className="flex flex-col gap-1">
+                    <td className="py-2 px-2 overflow-hidden">
+                      {(() => {
+                        const hasCallButton = hasOutstandingBalance(patient) && onCallPatient;
+                        const hasDisconnectButton = shouldShowDisconnectButton(patient) && onEndCall;
+                        const hasNotesButton = (patient.call_count || 0) > 0 && onViewNotes;
+                        const hasAnyButton = hasCallButton || hasDisconnectButton || hasNotesButton;
 
-                        {/* Call buttons */}
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {hasOutstandingBalance(patient) && onCallPatient && (
-                            !patient.phone_number || patient.phone_number.toLowerCase() === 'nan' || patient.phone_number.length < 10 ? (
-                              <Button
-                                size="sm"
-                                disabled
-                                className="neumorphic-button-primary px-4 py-2 h-auto text-sm"
-                                title="Phone number is missing or invalid"
-                              >
-                                <FiPhone className="w-4 h-4" />
-                                <span>Missing</span>
-                              </Button>
-                            ) : !patient.patient_first_name || !patient.patient_last_name || patient.patient_first_name.toLowerCase() === 'nan' || patient.patient_last_name.toLowerCase() === 'nan' ? (
-                              <Button
-                                size="sm"
-                                disabled
-                                className="neumorphic-button-primary px-4 py-2 h-auto text-sm"
-                                title="Patient name is missing"
-                              >
-                                <FiPhone className="w-4 h-4" />
-                                <span>Missing</span>
-                              </Button>
-                            ) : isCallActive(patient) ? (
-                              <Button
-                                size="sm"
-                                disabled
-                                className="neumorphic-button-primary px-4 py-2 h-auto text-sm"
-                                title="Call in progress..."
-                              >
-                                <FiPhone className="w-4 h-4" />
-                                <span>Calling...</span>
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                className="neumorphic-button-primary px-4 py-2 h-auto text-sm"
-                                onClick={() => onCallPatient(patient)}
-                                title="Call patient"
-                              >
-                                <FiPhone className="w-4 h-4" />
-                                <span>Call</span>
-                              </Button>
-                            )
-                          )}
+                        return (
+                          <div className="flex flex-col gap-1 min-h-[2.5rem]">
+                            {/* Call buttons */}
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {hasCallButton && (
+                                !patient.phone_number || patient.phone_number.toLowerCase() === 'nan' || patient.phone_number.length < 10 ? (
+                                  <Button
+                                    size="sm"
+                                    disabled
+                                    className="liquid-glass-btn-primary px-4 py-2 h-auto text-sm"
+                                    title="Phone number is missing or invalid"
+                                  >
+                                    <FiPhone className="w-4 h-4" />
+                                    <span>Missing</span>
+                                  </Button>
+                                ) : !patient.patient_first_name || !patient.patient_last_name || patient.patient_first_name.toLowerCase() === 'nan' || patient.patient_last_name.toLowerCase() === 'nan' ? (
+                                  <Button
+                                    size="sm"
+                                    disabled
+                                    className="liquid-glass-btn-primary px-4 py-2 h-auto text-sm"
+                                    title="Patient name is missing"
+                                  >
+                                    <FiPhone className="w-4 h-4" />
+                                    <span>Missing</span>
+                                  </Button>
+                                ) : isCallActive(patient) ? (
+                                  <Button
+                                    size="sm"
+                                    disabled
+                                    className="liquid-glass-btn-primary px-4 py-2 h-auto text-sm"
+                                    title="Call in progress..."
+                                  >
+                                    <FiPhone className="w-4 h-4" />
+                                    <span>Calling...</span>
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    className="liquid-glass-btn-primary px-4 py-2 h-auto text-sm"
+                                    onClick={() => onCallPatient(patient)}
+                                    title="Call patient"
+                                  >
+                                    <FiPhone className="w-4 h-4" />
+                                    <span>Call</span>
+                                  </Button>
+                                )
+                              )}
 
-                          {shouldShowDisconnectButton(patient) && onEndCall && (
-                            <Button
-                              size="sm"
-                              className="neumorphic-button-primary px-4 py-2 h-auto text-sm"
-                              onClick={() => onEndCall(patient)}
-                              disabled={isDisconnectButtonDisabled(patient)}
-                              title={isDisconnectButtonDisabled(patient) ? "Processing post-call updates..." : "End call"}
-                            >
-                              <FiPhoneOff className="w-4 h-4" />
-                              <span>{isDisconnectButtonDisabled(patient) ? 'Processing...' : 'Disconnect'}</span>
-                            </Button>
-                          )}
-                        </div>
+                              {hasDisconnectButton && (
+                                <Button
+                                  size="sm"
+                                  className="liquid-glass-btn-primary px-4 py-2 h-auto text-sm"
+                                  onClick={() => onEndCall(patient)}
+                                  disabled={isDisconnectButtonDisabled(patient)}
+                                  title={isDisconnectButtonDisabled(patient) ? "Processing post-call updates..." : "End call"}
+                                >
+                                  <FiPhoneOff className="w-4 h-4" />
+                                  <span>{isDisconnectButtonDisabled(patient) ? 'Processing...' : 'Disconnect'}</span>
+                                </Button>
+                              )}
+                            </div>
 
-                        {/* Notes button */}
-                        {(patient.call_count || 0) > 0 && onViewNotes && (
-                          <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              className="neumorphic-button-primary px-4 py-2 h-auto text-sm"
-                              onClick={() => onViewNotes(patient)}
-                              title="View notes"
-                            >
-                              <FiEye className="w-4 h-4" />
-                              <span>Notes</span>
-                            </Button>
+                            {/* Notes button */}
+                            {hasNotesButton && (
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  className="liquid-glass-btn-primary px-4 py-2 h-auto text-sm"
+                                  onClick={() => onViewNotes(patient)}
+                                  title="View notes"
+                                >
+                                  <FiEye className="w-4 h-4" />
+                                  <span>Notes</span>
+                                </Button>
+                              </div>
+                            )}
+
+                            {/* Placeholder when no buttons */}
+                            {!hasAnyButton && (
+                              <div className="h-8 flex items-center">
+                                <span className="text-transparent text-xs">-</span>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
+                        );
+                      })()}
                     </td>
                   </tr>
                 );
@@ -945,5 +1092,7 @@ export const PatientTable = ({
 };
 
 export default PatientTable;
+
+
 
 

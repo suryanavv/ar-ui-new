@@ -109,7 +109,7 @@ export function DatePicker({
         placeholder={placeholder}
         disabled={disabled}
         className={cn(
-          "w-full px-3 py-2 text-sm neumorphic-inset rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-foreground",
+          "w-full px-3 py-2 text-sm liquid-glass-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-foreground",
           isFocused && "ring-2 ring-ring",
           className
         )}

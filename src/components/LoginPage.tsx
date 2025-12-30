@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -16,17 +16,6 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sessionExpired, setSessionExpired] = useState(false);
-
-  useEffect(() => {
-    // Check if user was redirected due to session expiry
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('session_expired') === 'true') {
-      setSessionExpired(true);
-      // Clean up URL parameter
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,9 +63,9 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
           </div>
 
           <div className="flex-1 flex flex-col justify-center">
-            <h2 className="text-3xl xl:text-4xl mb-4 xl:mb-6 leading-tight">Effortlessly manage your medical practice.</h2>
+            <h2 className="text-3xl xl:text-4xl mb-4 xl:mb-6 leading-tight">Streamline your accounts receivable operations.</h2>
             <p className="text-base xl:text-lg leading-relaxed">
-              Manage Patients Information, Appointments, and more.
+              Manage patient invoices, track payments, automate collections, and more.
             </p>
           </div>
 
@@ -99,34 +88,6 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
           </div>
 
           <div className="space-y-3 sm:space-y-4">
-            {/* Session Expired Modal */}
-            {sessionExpired && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-md">
-                <div className="liquid-glass rounded-2xl p-8 max-w-md w-full mx-4 animate-in fade-in zoom-in duration-200">
-                  <div className="flex flex-col items-center text-center">
-                    <div className="w-16 h-16 bg-gradient-to-br from-amber-500/20 to-orange-500/20 rounded-full flex items-center justify-center mb-4 border border-white/40">
-                      <AlertCircle className="text-foreground" size={32} />
-                    </div>
-
-                    <h2 className="text-2xl font-bold text-foreground mb-3">
-                      Session Expired
-                    </h2>
-
-                    <p className="text-foreground mb-6 leading-relaxed">
-                      Your session has timed out due to inactivity. For your security, please log in again to continue using the dashboard.
-                    </p>
-
-                    <button
-                      onClick={() => setSessionExpired(false)}
-                      className="w-full py-3 px-6 liquid-glass-btn-primary text-white rounded-xl font-semibold transition-all duration-200"
-                    >
-                      Continue to Login
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
             <div className="text-center -mt-2 sm:-mt-3">
               {/* <h2 className="text-xl sm:text-2xl text-foreground font-semibold">Login</h2> */}
               {/* <p className="text-sm sm:text-base mt-1">Sign in to your account</p> */}

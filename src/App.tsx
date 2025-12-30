@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import './App.css';
 import {
   MessageAlert,
@@ -14,8 +15,10 @@ import {
   UserManagement,
   PatientsTab,
   ToastContainer,
-  useToast
+  useToast,
+  NotFoundPage
 } from './components';
+import { SessionExpiredModal } from './components/SessionExpiredModal';
 import { AppSidebar } from './components/app-sidebar';
 import { AppHeader } from './components/app-header';
 import { SidebarProvider } from './components/ui/sidebar';
@@ -29,23 +32,32 @@ import { getPatientCallKey, getPatientFullName } from './utils/patientUtils';
 import type { Patient, Message, User } from './types';
 
 function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [isSSOMode, setIsSSOMode] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   // UI state
   const [currentFile, setCurrentFile] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [selectedUploadId, setSelectedUploadId] = useState<number | null>(null);
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'ar-operations' | 'invoice-list' | 'patients' | 'users'>(() => {
-    // Restore active section from localStorage on page load
-    const storedSection = localStorage.getItem('activeSection');
-    // Handle backward compatibility: convert 'upload' to 'ar-operations'
-    const section = storedSection === 'upload' ? 'ar-operations' : storedSection;
-    return (section as 'dashboard' | 'ar-operations' | 'invoice-list' | 'patients' | 'users') || 'dashboard';
-  });
+  
+  // Get current section from route path
+  const getActiveSectionFromPath = (pathname: string): 'dashboard' | 'ar-operations' | 'invoice-list' | 'patients' | 'users' => {
+    if (pathname === '/' || pathname === '/dashboard') return 'dashboard';
+    if (pathname === '/ar-operations') return 'ar-operations';
+    if (pathname === '/invoice-list') return 'invoice-list';
+    if (pathname === '/patients') return 'patients';
+    if (pathname === '/users') return 'users';
+    return 'dashboard';
+  };
+  
+  const activeSection = getActiveSectionFromPath(location.pathname);
   const [message, setMessage] = useState<Message | null>(null);
   const [callingInProgress, setCallingInProgress] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -119,6 +131,18 @@ function App() {
     selectedUploadIdRef.current = selectedUploadId;
   }, [selectedUploadId, selectedUploadIdRef]);
 
+  // Listen for session expired events
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setSessionExpired(true);
+    };
+
+    window.addEventListener('session-expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('session-expired', handleSessionExpired);
+    };
+  }, []);
+
   // Check if user is already logged in on mount
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -168,7 +192,7 @@ function App() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkingAuth, isAuthenticated, activeSection]);
+  }, [checkingAuth, isAuthenticated, location.pathname]);
 
   // Clean up activeCalls when patient data changes - remove entries for completed/failed calls
   // ONLY after post-call notes are updated
@@ -219,8 +243,7 @@ function App() {
     localStorage.setItem('user', JSON.stringify(userData));
     setIsAuthenticated(true);
     setUser(userData);
-    localStorage.setItem('activeSection', 'dashboard');
-    setActiveSection('dashboard');
+    navigate('/dashboard');
   };
 
   // Handle logout
@@ -232,11 +255,19 @@ function App() {
     localStorage.removeItem('currentFile');
     localStorage.removeItem('callingInProgress');
     localStorage.removeItem('activeCalls');
-    localStorage.setItem('activeSection', 'dashboard');
     setIsAuthenticated(false);
     setUser(null);
     setCurrentFile('');
-    setActiveSection('dashboard');
+    setSessionExpired(false);
+    navigate('/');
+  };
+
+  // Handle session expired login redirect
+  const handleSessionExpiredLogin = () => {
+    setSessionExpired(false);
+    handleLogout();
+    // Redirect to login page
+    window.location.href = '/';
   };
 
   const showMessage = (type: 'success' | 'error' | 'info', text: string) => {
@@ -833,12 +864,19 @@ function App() {
   };
 
   const handleSectionChange = (section: 'dashboard' | 'ar-operations' | 'invoice-list' | 'patients' | 'users') => {
-    // Save active section to localStorage so it persists on page refresh
-    localStorage.setItem('activeSection', section);
+    const routeMap: Record<string, string> = {
+      'dashboard': '/dashboard',
+      'ar-operations': '/ar-operations',
+      'invoice-list': '/invoice-list',
+      'patients': '/patients',
+      'users': '/users'
+    };
 
+    const route = routeMap[section] || '/dashboard';
+    
     if (section === 'dashboard') {
       stopAutoRefresh();
-      setActiveSection('dashboard');
+      navigate(route);
       setTimeout(() => {
         const refreshDashboard = (window as { refreshDashboard?: () => void }).refreshDashboard;
         if (refreshDashboard) {
@@ -846,11 +884,11 @@ function App() {
         }
       }, 100);
     } else if (section === 'ar-operations') {
-      setActiveSection('ar-operations');
+      navigate(route);
       const currentUploadId = getSelectedUploadId();
       loadPatientData(currentUploadId, false);
     } else {
-      setActiveSection(section);
+      navigate(route);
     }
   };
 
@@ -868,89 +906,120 @@ function App() {
     return <SSOLogin onLogin={handleLogin} />;
   }
 
-  // Show login page if not authenticated
+  // Public routes (login, not-found) - full screen without sidebar
   if (!isAuthenticated) {
-    return <LoginPage onLogin={handleLogin} />;
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+        <Route path="/not-found" element={<NotFoundPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
   }
 
-
   return (
-    <div className="relative min-h-screen bg-[#d4d7e9]">
-      {/* APP CONTENT */}
-      <div className="relative z-10 min-h-screen">
-        <SidebarProvider
-          style={
-            {
-              "--sidebar-width": "calc(var(--spacing) * 64)",
-            } as React.CSSProperties
-          }
-        >
-          <AppSidebar
-            variant="floating"
-            onPageChange={(page: string) => handleSectionChange(page as 'dashboard' | 'ar-operations' | 'invoice-list' | 'patients' | 'users')}
-            currentPage={activeSection}
-            onLogout={handleLogout}
-            userData={user}
-          />
-          <main className="main-content-wrapper">
-            <AppHeader currentPage={activeSection} />
-            <div className="main-content-scrollable">
-              <div className="@container/main flex flex-1 flex-col my-2">
-                <div className="flex flex-col">
-                  {message && <MessageAlert message={message} />}
-                  <ToastContainer toasts={toasts} onRemove={removeToast} />
+    <Routes>
+      {/* Not found route - full screen without sidebar */}
+      <Route path="/not-found" element={<NotFoundPage />} />
+      
+      {/* Protected routes layout with sidebar */}
+      <Route path="*" element={
+        <div className="relative min-h-screen bg-[#d4d7e9]">
+          {/* Session Expired Modal - Global (shows on any page except login) */}
+          {!isSSOMode && (
+            <SessionExpiredModal 
+              isOpen={sessionExpired} 
+              onLogin={handleSessionExpiredLogin}
+            />
+          )}
+          
+          {/* APP CONTENT */}
+          <div className="relative z-10 min-h-screen">
+            <SidebarProvider
+              style={
+                {
+                  "--sidebar-width": "calc(var(--spacing) * 64)",
+                } as React.CSSProperties
+              }
+            >
+              <AppSidebar
+                variant="floating"
+                onPageChange={(page: string) => handleSectionChange(page as 'dashboard' | 'ar-operations' | 'invoice-list' | 'patients' | 'users')}
+                currentPage={activeSection}
+                onLogout={handleLogout}
+                userData={user}
+              />
+              <main className="main-content-wrapper">
+                <AppHeader currentPage={activeSection} />
+                <div className="main-content-scrollable">
+                  <div className="@container/main flex flex-1 flex-col my-2">
+                    <div className="flex flex-col">
+                      {message && <MessageAlert message={message} />}
+                      <ToastContainer toasts={toasts} onRemove={removeToast} />
 
-                  {activeSection === 'dashboard' && (
-                    <div className="mb-4 sm:mb-8 space-y-4 sm:space-y-6 px-4 lg:px-6">
-                      <Dashboard />
-                    </div>
-                  )}
-
-                  {activeSection === 'invoice-list' && (
-                    <div className="mb-8 px-4 lg:px-6">
-                      <InvoiceList onFileSelect={() => { }} />
-                    </div>
-                  )}
-
-                  {activeSection === 'patients' && (
-                    <div className="mb-8 px-4 lg:px-6">
-                      <PatientsTab
-                        onViewNotes={handleViewNotes}
-                        onViewCallHistory={handleViewCallHistory}
-                        onViewDetails={handleViewDetails}
-                        showMessage={showMessage}
-                      />
-                    </div>
-                  )}
-
-                  {/* {activeSection === 'users' && isAdmin && <UserManagement />} */}
-
-                  {activeSection === 'ar-operations' && (
-                    <div className="px-4 lg:px-6">
-                      <UploadSection
-                        availableFiles={availableFiles}
-                        selectedUploadId={selectedUploadId}
-                        patients={patients}
-                        loading={loading}
-                        uploadLoading={uploadLoading}
-                        callingInProgress={callingInProgress}
-                        activeCalls={activeCalls}
-                        batchCallProgress={batchCallProgress}
-                        currentFile={currentFile}
-                        onFileUpload={handleFileUpload}
-                        onFileSelect={handleFileSelect}
-                        onBatchCall={handleBatchCall}
-                        onViewNotes={handleViewNotes}
-                        onCallPatient={handleCallPatient}
-                        onEndCall={handleEndCall}
-                        onViewCallHistory={handleViewCallHistory}
-                        onRefreshPatients={async () => {
-                          await loadPatientData(selectedUploadId, true); // silent=true to avoid showing loading message
-                        }}
-                        onViewDetails={handleViewDetails}
-                      />
-                    </div>
-                  )}
+                      <Routes>
+                        <Route 
+                          path="/dashboard" 
+                          element={
+                            <div className="mb-4 sm:mb-8 space-y-4 sm:space-y-6 px-4 lg:px-6">
+                              <Dashboard />
+                            </div>
+                          } 
+                        />
+                        <Route 
+                          path="/invoice-list" 
+                          element={
+                            <div className="mb-8 px-4 lg:px-6">
+                              <InvoiceList onFileSelect={() => { }} />
+                            </div>
+                          } 
+                        />
+                        <Route 
+                          path="/patients" 
+                          element={
+                            <div className="mb-8 px-4 lg:px-6">
+                              <PatientsTab
+                                onViewNotes={handleViewNotes}
+                                onViewCallHistory={handleViewCallHistory}
+                                onViewDetails={handleViewDetails}
+                                showMessage={showMessage}
+                              />
+                            </div>
+                          } 
+                        />
+                        <Route 
+                          path="/ar-operations" 
+                          element={
+                            <div className="px-4 lg:px-6">
+                              <UploadSection
+                                availableFiles={availableFiles}
+                                selectedUploadId={selectedUploadId}
+                                patients={patients}
+                                loading={loading}
+                                uploadLoading={uploadLoading}
+                                callingInProgress={callingInProgress}
+                                activeCalls={activeCalls}
+                                batchCallProgress={batchCallProgress}
+                                currentFile={currentFile}
+                                onFileUpload={handleFileUpload}
+                                onFileSelect={handleFileSelect}
+                                onBatchCall={handleBatchCall}
+                                onViewNotes={handleViewNotes}
+                                onCallPatient={handleCallPatient}
+                                onEndCall={handleEndCall}
+                                onViewCallHistory={handleViewCallHistory}
+                                onRefreshPatients={async () => {
+                                  await loadPatientData(selectedUploadId, true); // silent=true to avoid showing loading message
+                                }}
+                                onViewDetails={handleViewDetails}
+                              />
+                            </div>
+                          } 
+                        />
+                        <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                        <Route path="*" element={<Navigate to="/not-found" replace />} />
+                      </Routes>
 
                   <ConfirmModal
                     isOpen={showConfirmModal}
@@ -984,34 +1053,31 @@ function App() {
                     onClose={() => setShowNotesModal(false)}
                   />
 
-                  <CallHistoryModal
-                    isOpen={showCallHistoryModal}
-                    patientFirstName={selectedPatient?.patient_first_name || ''}
-                    patientLastName={selectedPatient?.patient_last_name || ''}
-                    phoneNumber={selectedPatient?.phone_number || ''}
-                    invoiceNumber={selectedPatient?.invoice_number || ''}
-                    patientDob={selectedPatient?.patient_dob || ''}
-                    onClose={() => setShowCallHistoryModal(false)}
-                  />
+                  {selectedPatient && (
+                    <CallHistoryModal
+                      isOpen={showCallHistoryModal}
+                      patient={selectedPatient}
+                      onClose={() => setShowCallHistoryModal(false)}
+                    />
+                  )}
 
                   {showPatientDetails && selectedPatient && (
                     <PatientDetails
-                      invoiceId={selectedPatient.id}
-                      phoneNumber={selectedPatient.phone_number}
-                      invoiceNumber={selectedPatient.invoice_number}
-                      patientFirstName={selectedPatient.patient_first_name}
-                      patientLastName={selectedPatient.patient_last_name}
+                      patient={selectedPatient}
                       isOpen={showPatientDetails}
                       onClose={() => setShowPatientDetails(false)}
                     />
                   )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </main>
-        </SidebarProvider>
-      </div>
-    </div>
+              </main>
+            </SidebarProvider>
+          </div>
+        </div>
+      } 
+    />
+    </Routes>
   );
 }
 

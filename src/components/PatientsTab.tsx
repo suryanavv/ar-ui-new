@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Patient } from '../types';
 import { getAllPatients } from '../services/api';
 import { PatientTable } from './PatientTable';
 import { ConfirmModal } from './ConfirmModal';
-import { FiSearch, FiX, FiChevronDown, FiCheck } from 'react-icons/fi';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { IconFilter } from '@tabler/icons-react';
 
 interface PatientsTabProps {
   onViewNotes: (patient: Patient) => void;
@@ -28,10 +29,7 @@ export const PatientsTab = ({
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [callStatusFilter, setCallStatusFilter] = useState<CallStatusFilter>('all');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showBatchCallModal, setShowBatchCallModal] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Load all patients
   const loadPatients = async () => {
@@ -55,31 +53,6 @@ export const PatientsTab = ({
     loadPatients();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Handle click outside to close dropdown
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (
-        dropdownRef.current?.contains(target) ||
-        buttonRef.current?.contains(target)
-      ) {
-        return;
-      }
-      setIsDropdownOpen(false);
-    };
-
-    if (isDropdownOpen) {
-      const timeoutId = setTimeout(() => {
-        document.addEventListener('click', handleClickOutside, true);
-      }, 0);
-      
-      return () => {
-        clearTimeout(timeoutId);
-        document.removeEventListener('click', handleClickOutside, true);
-      };
-    }
-  }, [isDropdownOpen]);
 
   // Filter and search patients
   const filteredPatients = useMemo(() => {
@@ -148,150 +121,68 @@ export const PatientsTab = ({
     { value: 'completed', label: 'Completed calls', count: filterCounts.completed }
   ];
 
-  const selectedFilterOption = filterOptions.find(opt => opt.value === callStatusFilter);
-
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+    <>
       {/* Header Section */}
-      <div className="px-6 py-4 border-b border-gray-200">
-        {/* Title on Left, Search and Filter on Right */}
-        <div className="flex items-center justify-between gap-4">
-          {/* Title - Left Side */}
-          <div className="flex-shrink-0">
-            <h2 className="text-xl font-bold text-gray-900 whitespace-nowrap">All Patients</h2>
-            <p className="text-xs text-gray-500 whitespace-nowrap">
-              {filteredPatients.length} of {patients.length}
-            </p>
+      <div className="mb-4">
+        {/* Search and Filter Controls */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          {/* Search Input */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <input
+              type="text"
+              placeholder="Search by patient name or phone number"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-1 h-9 px-3 text-sm liquid-glass-input !rounded-full focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
           </div>
 
-          {/* Search and Filter - Right Side */}
-          <div className="flex items-center gap-3">
-            {/* Search Bar */}
-            <div className="w-80 relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FiSearch className="h-4 w-4 text-gray-400" />
-              </div>
-              <input
-                type="text"
-                placeholder="Search by patient name or phone..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-9 pr-9 py-2.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-colors"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <FiX className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-
-            {/* Custom Filter Dropdown */}
-            <div className="w-56 flex-shrink-0 relative" ref={dropdownRef}>
-              <button
-                ref={buttonRef}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsDropdownOpen(!isDropdownOpen);
-                }}
-                className="w-full px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 font-medium flex items-center justify-between hover:border-teal-500 hover:shadow-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
-              >
-                <span className="truncate">
-                  {selectedFilterOption?.label} ({selectedFilterOption?.count})
-                </span>
-                <FiChevronDown 
-                  className={`ml-2 h-5 w-5 text-gray-500 flex-shrink-0 transition-transform duration-200 ${
-                    isDropdownOpen ? 'transform rotate-180' : ''
-                  }`}
-                />
-              </button>
-
-              {isDropdownOpen && (
-                <div className="absolute z-50 mt-2 w-full bg-white rounded-lg shadow-xl border border-gray-200 py-2">
-                  {filterOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        setCallStatusFilter(option.value as CallStatusFilter);
-                        setIsDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
-                        callStatusFilter === option.value
-                          ? 'bg-teal-50 text-teal-700 font-semibold'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span>{option.label} ({option.count})</span>
-                      {callStatusFilter === option.value && (
-                        <FiCheck className="h-5 w-5 text-teal-600" />
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+          {/* Filter Dropdown */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <IconFilter className="w-4 h-4 flex-shrink-0" />
+            <span className="text-sm font-medium whitespace-nowrap hidden sm:inline">Filter by:</span>
+            <Select value={callStatusFilter} onValueChange={(value) => setCallStatusFilter(value as CallStatusFilter)}>
+              <SelectTrigger className="w-48 liquid-glass-input border-white/30 !rounded-full">
+                <SelectValue placeholder="Select filter" />
+              </SelectTrigger>
+              <SelectContent>
+                {filterOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label} ({option.count})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
-        {/* Active Filters and Batch Call */}
-        {(searchTerm || callStatusFilter !== 'all' || (callStatusFilter === 'all' && filteredPatients.length > 0)) && (
-          <div className="flex items-center justify-between mt-3">
-            <div className="flex items-center gap-2">
-              {(searchTerm || callStatusFilter !== 'all') && (
+        {/* Batch Call Button for Filtered Results */}
+        {onBatchCall && filteredPatients.length > 0 && (callStatusFilter !== 'all' || searchTerm.trim()) && (
+          <div className="flex items-center justify-end mt-3">
+            <button
+              onClick={() => setShowBatchCallModal(true)}
+              disabled={callingInProgress}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                callingInProgress
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'liquid-glass-btn-primary'
+              }`}
+            >
+              {callingInProgress ? (
                 <>
-                  <span className="text-xs text-gray-600">Active:</span>
-                  {searchTerm && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-50 text-teal-700 rounded text-xs">
-                      "{searchTerm}"
-                      <button onClick={() => setSearchTerm('')} className="hover:text-teal-900">
-                        <FiX className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                  {callStatusFilter !== 'all' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-teal-50 text-teal-700 rounded text-xs">
-                      {callStatusFilter}
-                      <button onClick={() => setCallStatusFilter('all')} className="hover:text-teal-900">
-                        <FiX className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Calling...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <span>Call Filtered ({filteredPatients.length})</span>
                 </>
               )}
-              <span className="text-xs text-gray-500">
-                ({filteredPatients.length} {filteredPatients.length === 1 ? 'patient' : 'patients'})
-              </span>
-            </div>
-            
-            {/* Batch Call Button for Filtered Results (when filter is applied OR search is active) */}
-            {onBatchCall && filteredPatients.length > 0 && (callStatusFilter !== 'all' || searchTerm.trim()) && (
-              <button
-                onClick={() => setShowBatchCallModal(true)}
-                disabled={callingInProgress}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  callingInProgress
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-teal-600 text-white hover:bg-teal-700 hover:shadow-md'
-                }`}
-              >
-                {callingInProgress ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Calling...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                    <span>Call Filtered ({filteredPatients.length})</span>
-                  </>
-                )}
-              </button>
-            )}
+            </button>
           </div>
         )}
       </div>
@@ -322,7 +213,7 @@ export const PatientsTab = ({
         }}
         onCancel={() => setShowBatchCallModal(false)}
       />
-    </div>
+    </>
   );
 };
 

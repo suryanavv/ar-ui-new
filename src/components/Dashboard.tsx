@@ -9,10 +9,8 @@ import {
   FiDollarSign,
   FiCheckCircle,
   FiPhone,
-  FiLink,
   FiCalendar,
   FiActivity,
-  FiUpload,
   FiChevronLeft,
   FiChevronRight
 } from 'react-icons/fi';
@@ -255,7 +253,7 @@ export const Dashboard = () => {
 
   if (!stats) {
     return (
-      <div className="neumorphic-inset p-6 rounded-xl">
+      <div className="liquid-glass p-6 rounded-xl border border-white/20 shadow-lg">
         <div className="text-center py-8">
           <FiActivity className="w-12 h-12 mx-auto mb-4 text-foreground" />
           <p className="text-foreground">Unable to load dashboard statistics</p>
@@ -268,9 +266,9 @@ export const Dashboard = () => {
 
   if (isEmpty) {
     return (
-      <div className="neumorphic-inset p-8 rounded-xl">
+      <div className="liquid-glass p-8 rounded-xl border border-white/20 shadow-lg">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 neumorphic-soft rounded-full flex items-center justify-center">
+          <div className="w-16 h-16 mx-auto mb-4 liquid-glass rounded-full flex items-center justify-center border border-white/30 shadow-md">
             <FiFileText className="w-8 h-8 text-foreground" />
           </div>
           <h3 className="text-lg font-semibold mb-2 text-foreground">No Data Available</h3>
@@ -318,7 +316,7 @@ export const Dashboard = () => {
     },
     {
       key: 'outstanding',
-      label: 'Outstanding',
+      label: 'Total Outstanding',
       icon: FiDollarSign,
       value: stats.total_outstanding,
       gradient: 'from-red-500/20 via-red-500/10 to-transparent',
@@ -328,7 +326,7 @@ export const Dashboard = () => {
     },
     {
       key: 'amountPaid',
-      label: 'Amount Paid',
+      label: 'Total Amount Paid',
       icon: FiCheckCircle,
       value: stats.total_amount_paid || 0,
       gradient: 'from-emerald-500/20 via-emerald-500/10 to-transparent',
@@ -336,6 +334,7 @@ export const Dashboard = () => {
       formatValue: formatCurrency,
       onClick: () => setShowPaidPatientsModal(true),
       useSmallerText: true,
+      subtitle: 'Click to view details',
     },
   ];
 
@@ -347,55 +346,24 @@ export const Dashboard = () => {
       value: stats.calls_made,
       gradient: 'from-indigo-500/20 via-indigo-500/10 to-transparent',
       border: 'border-indigo-500/50',
-      badges: [
-        { label: 'done', value: stats.calls_completed, color: 'emerald' },
-        { label: 'pending', value: stats.calls_pending, color: 'yellow' },
-      ],
-    },
-    {
-      key: 'linksSent',
-      label: 'Links Sent',
-      icon: FiLink,
-      value: stats.links_sent,
-      gradient: 'from-purple-500/20 via-purple-500/10 to-transparent',
-      border: 'border-purple-500/50',
-      subtitle: `${stats.links_requested} requested`,
-    },
-    {
-      key: 'thisWeek',
-      label: 'This Week',
-      icon: FiActivity,
-      value: stats.recent_calls,
-      gradient: 'from-purple-500/20 via-purple-500/10 to-transparent',
-      border: 'border-purple-500/50',
-      subtitle: `${stats.recent_uploads} uploads`,
-    },
-    {
-      key: 'files',
-      label: 'Files',
-      icon: FiUpload,
-      value: stats.total_files,
-      gradient: 'from-fuchsia-500/20 via-fuchsia-500/10 to-transparent',
-      border: 'border-fuchsia-500/50',
     },
   ];
 
   // Render metric card component
   const renderMetricCard = (metric: MetricConfig) => {
     const IconComponent = metric.icon;
-    const displayValue = metric.formatValue 
+    const displayValue = metric.formatValue
       ? metric.formatValue(typeof metric.value === 'number' ? metric.value : 0)
       : metric.value;
-    const textSizeClass = metric.useSmallerText 
-      ? 'text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl'
-      : 'text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl';
+    const textSizeClass = metric.useSmallerText
+      ? 'text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl'
+      : 'text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl';
 
     return (
       <div
         key={metric.key}
-        className={`relative overflow-hidden rounded-xl sm:rounded-2xl p-3 sm:p-4 transition-all duration-300 group ${
-          metric.onClick ? 'cursor-pointer' : ''
-        }
+        className={`relative overflow-hidden rounded-xl sm:rounded-2xl p-3 sm:p-4 transition-all duration-300 group ${metric.onClick ? 'cursor-pointer' : ''
+          }
           bg-gradient-to-br ${metric.gradient}
           backdrop-blur-xl border-2 ${metric.border}
           shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_0_25px_rgba(255,255,255,0.4)]
@@ -426,7 +394,7 @@ export const Dashboard = () => {
                     key={idx}
                     className={`text-[9px] sm:text-[10px] md:text-xs px-1 sm:px-1.5 py-0.5 rounded backdrop-blur-sm border ${colorClasses[badge.color as keyof typeof colorClasses] || colorClasses.emerald}`}
                   >
-                    {badge.value} {badge.label}
+                    {badge.label}: {badge.value}
                   </span>
                 );
               })}
@@ -440,19 +408,15 @@ export const Dashboard = () => {
     );
   };
 
+  // Combine all metrics into one array
+  const allMetrics = [...primaryMetrics, ...secondaryMetrics];
+
   return (
     <div className="space-y-3 sm:space-y-4 md:space-y-6 px-2 sm:px-4 md:px-0">
-      {/* Primary Stats Row - Glass Cards */}
+      {/* All Stats Cards in One Row */}
       <div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          {primaryMetrics.map(renderMetricCard)}
-        </div>
-      </div>
-
-      {/* Secondary Stats Row - Glass Cards */}
-      <div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          {secondaryMetrics.map(renderMetricCard)}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 md:gap-4">
+          {allMetrics.map(renderMetricCard)}
         </div>
       </div>
 
@@ -464,9 +428,9 @@ export const Dashboard = () => {
           </h1>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4">
           {/* Calls Table - LEFT side (order-2 on mobile, order-1 on desktop) */}
-          <div className="order-2 md:order-1 col-span-12 md:col-span-7 lg:col-span-8 flex flex-col">
+          <div className="order-2 lg:order-1 col-span-12 lg:col-span-7 xl:col-span-8 flex flex-col">
             {selectedDate ? (
               <div className="flex-1 flex flex-col" key={selectedDate}>
                 {loadingCalls ? (
@@ -481,57 +445,47 @@ export const Dashboard = () => {
                     <div className="overflow-hidden rounded-lg sm:rounded-xl flex-1 flex flex-col relative z-10">
                       {/* Fixed Header Table */}
                       <div className="overflow-x-auto">
-                        <table className="w-full text-xs sm:text-sm table-fixed min-w-[400px]">
+                        <table className="w-full text-[10px] sm:text-xs md:text-sm table-fixed min-w-[320px] sm:min-w-[400px]">
                           <colgroup>
-                            <col className="w-[20%] md:w-[15%]" />
-                            <col className="w-[50%] md:w-[30%]" />
-                            <col className="w-[0%] md:w-[25%]" />
-                            <col className="w-[30%] md:w-[30%]" />
+                            <col className="w-[33%]" />
+                            <col className="w-[34%]" />
+                            <col className="w-[33%]" />
                           </colgroup>
                           <thead className="bg-[#9a8ea2]">
                             <tr>
-                              <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base">Time</th>
-                              <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base">Patient</th>
-                              <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base hidden md:table-cell">Invoice</th>
-                              <th className="text-right font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base">Outstanding</th>
+                              <th className="text-left font-bold py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4 text-foreground text-[10px] sm:text-xs md:text-sm">Time</th>
+                              <th className="text-left font-bold py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4 text-foreground text-[10px] sm:text-xs md:text-sm">Patient</th>
+                              <th className="text-right font-bold py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4 text-foreground text-[10px] sm:text-xs md:text-sm">Outstanding</th>
                             </tr>
                           </thead>
                         </table>
                       </div>
 
                       {/* Scrollable Body Container */}
-                      <div className="overflow-x-auto max-h-[200px] sm:max-h-[280px] md:max-h-[320px] overflow-y-auto flex-1 bg-white/80 rounded-lg">
-                        <table className="w-full text-xs sm:text-sm table-fixed min-w-[400px]">
+                      <div className="overflow-x-auto max-h-[30vh] sm:max-h-[40vh] md:max-h-[46vh] overflow-y-auto flex-1 bg-white/80 rounded-lg">
+                        <table className="w-full text-[10px] sm:text-xs md:text-sm table-fixed min-w-[320px] sm:min-w-[400px]">
                           <colgroup>
-                            <col className="w-[20%] md:w-[15%]" />
-                            <col className="w-[50%] md:w-[30%]" />
-                            <col className="w-[0%] md:w-[25%]" />
-                            <col className="w-[30%] md:w-[30%]" />
+                            <col className="w-[33%]" />
+                            <col className="w-[34%]" />
+                            <col className="w-[33%]" />
                           </colgroup>
                           <tbody className="divide-y divide-[#9a8ea2]/30">
                             {selectedDateCalls.map((call, index) => (
                               <tr key={index} className="bg-transparent hover:bg-white/10 transition-colors cursor-pointer">
-                                <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4">
+                                <td className="py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4">
                                   <div className="flex items-center gap-1 md:gap-2">
-                                    <span className="text-xs sm:text-sm md:text-base text-foreground whitespace-nowrap">
+                                    <span className="text-[10px] sm:text-xs md:text-sm text-foreground whitespace-nowrap">
                                       {formatTime(call.called_at)}
                                     </span>
                                   </div>
                                 </td>
-                                <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4">
-                                  <span className="text-xs sm:text-sm md:text-base font-semibold text-foreground break-words">
+                                <td className="py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4">
+                                  <span className="text-[10px] sm:text-xs md:text-sm font-semibold text-foreground break-words">
                                     {`${call.patient_first_name || ''} ${call.patient_last_name || ''}`.trim() || 'Unknown'}
                                   </span>
                                 </td>
-                                <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 hidden md:table-cell">
-                                  <span className="text-sm md:text-base text-foreground truncate block">
-                                    {call.invoice_number && call.invoice_number !== 'value_or_empty'
-                                      ? call.invoice_number
-                                      : '-'}
-                                  </span>
-                                </td>
-                                <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-right">
-                                  <span className="text-xs sm:text-sm md:text-base font-semibold text-foreground">
+                                <td className="py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4 text-right">
+                                  <span className="text-[10px] sm:text-xs md:text-sm font-semibold text-foreground">
                                     {formatCurrency(call.outstanding_amount)}
                                   </span>
                                 </td>
@@ -571,7 +525,7 @@ export const Dashboard = () => {
           </div>
 
           {/* Calendar Component */}
-          <div className="order-1 md:order-2 col-span-12 md:col-span-5 lg:col-span-4 w-full max-w-full sm:max-w-md md:max-w-none mx-auto md:mx-0">
+          <div className="order-1 lg:order-2 col-span-12 lg:col-span-5 xl:col-span-4 w-full max-w-full sm:max-w-md lg:max-w-none mx-auto lg:mx-0">
             {/* Calendar Content */}
             <div className="relative p-2 sm:p-3 md:p-4 items-center justify-center bg-gradient-to-br from-[#d7d7f3]/80 to-[#e5e5f8]/60 backdrop-blur-xl rounded-lg sm:rounded-xl border-2 border-[#b8a0d4]/50 shadow-[0_0_20px_rgba(184,160,212,0.3),0_8px_32px_rgba(200,200,240,0.25),inset_0_1px_0_rgba(255,255,255,0.4)] overflow-hidden w-full min-h-[280px] sm:min-h-[300px] md:min-h-[320px] flex flex-col glass-shine">
               {/* Glossy Top Highlight */}
@@ -589,7 +543,7 @@ export const Dashboard = () => {
                 </div>
                 <h1
                   key={`${currentMonth}-${currentYear}`}
-                  className="text-sm sm:text-base md:text-lg font-semibold flex-1 text-center text-foreground px-2"
+                  className="text-xs sm:text-sm md:text-base font-semibold flex-1 text-center text-foreground px-2"
                 >
                   {months[currentMonth - 1]} {currentYear}
                 </h1>
@@ -610,7 +564,7 @@ export const Dashboard = () => {
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
                     <div
                       key={day}
-                      className="text-center text-[9px] sm:text-[10px] md:text-xs lg:text-[12px] font-medium text-foreground px-0.5 py-1 sm:py-1.5 rounded min-w-0"
+                      className="text-center text-[8px] sm:text-[9px] md:text-[10px] lg:text-[11px] font-medium text-foreground px-0.5 py-1 sm:py-1.5 rounded min-w-0"
                     >
                       <span className="hidden sm:inline">{day}</span>
                       <span className="sm:hidden">{day.charAt(0)}</span>
@@ -647,9 +601,9 @@ export const Dashboard = () => {
                         <div
                           className={`
                             font-semibold text-center leading-tight transition-all duration-300
-                            ${day.isCurrentMonth && selectedDate === day.date 
-                              ? 'text-foreground text-sm sm:text-base md:text-lg' 
-                              : 'text-foreground text-xs sm:text-sm md:text-base'}
+                            ${day.isCurrentMonth && selectedDate === day.date
+                              ? 'text-foreground text-xs sm:text-sm md:text-base'
+                              : 'text-foreground text-[10px] sm:text-xs md:text-sm'}
                           `}
                         >
                           {day.date}
@@ -659,7 +613,7 @@ export const Dashboard = () => {
                         {day.hasCalls && day.isCurrentMonth && (
                           <div className="-mt-0.5 sm:-mt-1">
                             <div
-                              className={`appointment-badge inline-flex items-center justify-center text-[7px] sm:text-[8px] md:text-[9px] lg:text-[10px] font-medium rounded-full px-0.5 sm:px-1 ${selectedDate === day.date
+                              className={`appointment-badge inline-flex items-center justify-center text-[6px] sm:text-[7px] md:text-[8px] lg:text-[9px] font-medium rounded-full px-0.5 sm:px-1 ${selectedDate === day.date
                                 ? 'bg-white/40 text-foreground border border-white/50'
                                 : 'bg-[#5a8ac7]/20 text-foreground border border-[#5a8ac7]/40'
                                 }`}
@@ -695,7 +649,7 @@ export const Dashboard = () => {
             <div className="overflow-hidden rounded-lg sm:rounded-xl flex-1 flex flex-col relative z-10">
               {/* Fixed Header Table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-xs sm:text-sm table-fixed min-w-[500px]">
+                <table className="w-full text-[10px] sm:text-xs md:text-sm table-fixed min-w-[320px] sm:min-w-[400px] md:min-w-[500px]">
                   <colgroup>
                     <col className="w-[40%] md:w-[30%]" />
                     <col className="w-[30%] md:w-[25%]" />
@@ -704,10 +658,10 @@ export const Dashboard = () => {
                   </colgroup>
                   <thead className="bg-[#9a8ea2]">
                     <tr>
-                      <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base">Patient</th>
-                      <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base">Phone</th>
-                      <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base hidden md:table-cell">Called At</th>
-                      <th className="text-left font-bold py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 text-foreground text-xs sm:text-sm md:text-base">Status</th>
+                      <th className="text-left font-bold py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4 text-foreground text-[10px] sm:text-xs md:text-sm">Patient</th>
+                      <th className="text-left font-bold py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4 text-foreground text-[10px] sm:text-xs md:text-sm">Phone</th>
+                      <th className="text-left font-bold py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4 text-foreground text-[10px] sm:text-xs md:text-sm hidden md:table-cell">Called At</th>
+                      <th className="text-left font-bold py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4 text-foreground text-[10px] sm:text-xs md:text-sm">Status</th>
                     </tr>
                   </thead>
                 </table>
@@ -715,7 +669,7 @@ export const Dashboard = () => {
 
               {/* Scrollable Body Container */}
               <div className="overflow-x-auto max-h-[200px] sm:max-h-[300px] md:max-h-[50vh] overflow-y-auto flex-1 bg-white/80 rounded-lg">
-                <table className="w-full text-xs sm:text-sm table-fixed min-w-[500px]">
+                <table className="w-full text-[10px] sm:text-xs md:text-sm table-fixed min-w-[320px] sm:min-w-[400px] md:min-w-[500px]">
                   <colgroup>
                     <col className="w-[40%] md:w-[30%]" />
                     <col className="w-[30%] md:w-[25%]" />
@@ -725,19 +679,19 @@ export const Dashboard = () => {
                   <tbody className="divide-y divide-[#9a8ea2]/30">
                     {stats.recent_calls_list.map((call, index) => (
                       <tr key={index} className="bg-transparent hover:bg-white/10 transition-all duration-200">
-                        <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4">
-                          <span className="text-xs sm:text-sm md:text-base font-semibold text-foreground break-words">
+                        <td className="py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4">
+                          <span className="text-[10px] sm:text-xs md:text-sm font-semibold text-foreground break-words">
                             {`${call.patient_first_name || ''} ${call.patient_last_name || ''}`.trim() || 'Unknown'}
                           </span>
                         </td>
-                        <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4">
-                          <span className="text-xs sm:text-sm md:text-base text-foreground break-all">{call.phone_number}</span>
+                        <td className="py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4">
+                          <span className="text-[10px] sm:text-xs md:text-sm text-foreground break-all">{call.phone_number}</span>
                         </td>
-                        <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4 hidden md:table-cell">
-                          <span className="text-xs sm:text-sm md:text-base text-foreground">{formatDateTime(call.called_at)}</span>
+                        <td className="py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4 hidden md:table-cell">
+                          <span className="text-[10px] sm:text-xs md:text-sm text-foreground">{formatDateTime(call.called_at)}</span>
                         </td>
-                        <td className="py-1.5 sm:py-2 md:py-3 px-1.5 sm:px-2 md:px-4">
-                          <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs md:text-sm font-bold border text-foreground ${call.call_status === 'completed'
+                        <td className="py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4">
+                          <span className={`px-1.5 sm:px-2 md:px-3 py-0.5 rounded-full text-[8px] sm:text-[10px] md:text-xs font-bold border text-foreground ${call.call_status === 'completed'
                             ? 'bg-green-500/20 border-green-500/50'
                             : call.call_status === 'failed'
                               ? 'bg-red-500/20 border-red-500/50'
@@ -758,11 +712,11 @@ export const Dashboard = () => {
 
       {/* Paid Patients Modal */}
       {showPaidPatientsModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4" onClick={() => setShowPaidPatientsModal(false)}>
-          <div className="neumorphic-card max-w-full sm:max-w-2xl w-full max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col rounded-lg sm:rounded-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border flex items-center justify-between">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-50 p-2 sm:p-4 animate-in fade-in duration-200" onClick={() => setShowPaidPatientsModal(false)}>
+          <div className="liquid-glass-strong max-w-full sm:max-w-2xl w-full max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col rounded-lg sm:rounded-2xl border border-white/30 shadow-2xl animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-white/20 flex items-center justify-between">
               <h2 className="text-base sm:text-lg font-semibold text-foreground">Paid Patients</h2>
-              <button onClick={() => setShowPaidPatientsModal(false)} className="p-1.5 sm:p-2 neumorphic-button-plain rounded-lg">
+              <button onClick={() => setShowPaidPatientsModal(false)} className="p-1.5 sm:p-2 liquid-glass-btn rounded-lg hover:bg-white/20 transition-colors">
                 <FiX className="w-4 h-4 sm:w-5 sm:h-5 text-foreground" />
               </button>
             </div>
@@ -770,7 +724,7 @@ export const Dashboard = () => {
               {stats.paid_patients && stats.paid_patients.length > 0 ? (
                 <div className="space-y-2 sm:space-y-3">
                   {stats.paid_patients.map((patient, i) => (
-                    <div key={i} className="p-3 sm:p-4 neumorphic-soft rounded-lg sm:rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4">
+                    <div key={i} className="p-3 sm:p-4 liquid-glass rounded-lg sm:rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 border border-white/20 hover:border-white/30 transition-all">
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm sm:text-base text-foreground break-words">{`${patient.patient_first_name || ''} ${patient.patient_last_name || ''}`.trim() || 'Unknown'}</p>
                         <p className="text-xs sm:text-sm text-foreground break-words">Invoice: {patient.invoice_number}</p>
@@ -789,7 +743,7 @@ export const Dashboard = () => {
                 </div>
               )}
             </div>
-            <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-t border-border neumorphic-pressed flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm">
+            <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-t border-white/20 liquid-glass-subtle flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm">
               <span className="text-foreground">{stats.paid_patients?.length || 0} payments</span>
               <span className="font-bold text-foreground">{formatCurrency(stats.total_amount_paid || 0)}</span>
             </div>

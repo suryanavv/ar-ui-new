@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { Patient } from '../types';
-import { getAllPatients } from '../services/api';
+import { usePatientData } from '../hooks/usePatientData';
 import { PatientTable } from './PatientTable';
 import { ConfirmModal } from './ConfirmModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -22,35 +22,16 @@ export const PatientsTab = ({
   onViewCallHistory,
   onViewDetails,
   onBatchCall,
-  callingInProgress = false,
-  showMessage
+  callingInProgress = false
 }: PatientsTabProps) => {
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { patients, loading, loadPatientData } = usePatientData();
   const [searchTerm, setSearchTerm] = useState('');
   const [callStatusFilter, setCallStatusFilter] = useState<CallStatusFilter>('all');
   const [showBatchCallModal, setShowBatchCallModal] = useState(false);
 
-  // Load all patients
-  const loadPatients = async () => {
-    try {
-      setLoading(true);
-      const response = await getAllPatients();
-      if (response.success) {
-        setPatients(response.patients || []);
-      } else {
-        showMessage('error', 'Failed to load patients');
-      }
-    } catch (error) {
-      console.error('Failed to load patients:', error);
-      showMessage('error', 'Failed to load patients');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Load all patients using hook
   useEffect(() => {
-    loadPatients();
+    loadPatientData(null, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

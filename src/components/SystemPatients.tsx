@@ -127,7 +127,12 @@ export const SystemPatients = () => {
   };
 
   const getPatientName = (patient: SystemPatient): string => {
-    return `${patient.patient_first_name} ${patient.patient_last_name}`.trim();
+    const fullName = `${patient.patient_first_name} ${patient.patient_last_name}`.trim();
+    return fullName
+      .toLowerCase()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   const formatDate = (dateString: string): string => {
@@ -317,19 +322,19 @@ export const SystemPatients = () => {
                     </colgroup>
                     <thead className="bg-[#9a8ea2]">
                       <tr>
-                        <th className="text-left font-semibold py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-foreground text-[10px] sm:text-xs md:text-sm">
+                        <th className="text-left font-semibold py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-foreground text-xs md:text-sm">
                           Patient Name
                         </th>
-                        <th className="text-left font-semibold py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-foreground text-[10px] sm:text-xs md:text-sm">
+                        <th className="text-left font-semibold py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-foreground text-xs md:text-sm">
                           Contact Info
                         </th>
-                        <th className="text-left font-semibold py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-foreground text-[10px] sm:text-xs md:text-sm whitespace-nowrap">
+                        <th className="text-left font-semibold py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-foreground text-xs md:text-sm whitespace-nowrap">
                           Estimated Date
                         </th>
-                        <th className="text-left font-semibold py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-foreground text-[10px] sm:text-xs md:text-sm whitespace-nowrap">
+                        <th className="text-left font-semibold py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-foreground text-xs md:text-sm whitespace-nowrap">
                           Amount Paid
                         </th>
-                        <th className="text-left font-semibold py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-foreground text-[10px] sm:text-xs md:text-sm whitespace-nowrap">
+                        <th className="text-left font-semibold py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-foreground text-xs md:text-sm whitespace-nowrap">
                           Balance
                         </th>
                       </tr>
@@ -353,19 +358,19 @@ export const SystemPatients = () => {
                           key={patient.id}
                           className="bg-transparent hover:bg-white/10 transition-all duration-200"
                         >
-                          <td className="py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-[10px] sm:text-xs md:text-sm font-medium text-foreground truncate">
+                          <td className="py-3 sm:py-4 px-1.5 sm:px-2 md:px-3 lg:px-4 text-[10px] sm:text-xs md:text-sm font-medium text-foreground truncate">
                             {getPatientName(patient)}
                           </td>
-                          <td className="py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-[10px] sm:text-xs md:text-sm text-foreground truncate" style={{ textTransform: 'none' }}>
+                          <td className="py-3 sm:py-4 px-1.5 sm:px-2 md:px-3 lg:px-4 text-[10px] sm:text-xs md:text-sm text-foreground truncate" style={{ textTransform: 'none' }}>
                             {patient.phone_number}
                           </td>
-                          <td className="py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-[10px] sm:text-xs md:text-sm text-foreground whitespace-nowrap">
+                          <td className="py-3 sm:py-4 px-1.5 sm:px-2 md:px-3 lg:px-4 text-[10px] sm:text-xs md:text-sm text-foreground whitespace-nowrap">
                             {formatDate(patient.estimated_date)}
                           </td>
-                          <td className="py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-[10px] sm:text-xs md:text-sm font-medium text-green-600 whitespace-nowrap">
+                          <td className="py-3 sm:py-4 px-1.5 sm:px-2 md:px-3 lg:px-4 text-[10px] sm:text-xs md:text-sm font-medium text-green-600 whitespace-nowrap">
                             {formatCurrency(patient.amount_paid)}
                           </td>
-                          <td className="py-1.5 sm:py-2 px-1.5 sm:px-2 md:px-3 lg:px-4 text-[10px] sm:text-xs md:text-sm font-semibold text-red-600 whitespace-nowrap">
+                          <td className="py-3 sm:py-4 px-1.5 sm:px-2 md:px-3 lg:px-4 text-[10px] sm:text-xs md:text-sm font-semibold text-red-600 whitespace-nowrap">
                             {formatCurrency(patient.current_outstanding_balance)}
                           </td>
                         </tr>

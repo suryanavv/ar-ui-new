@@ -3,6 +3,8 @@
  * Decodes JWT tokens without verification (client-side only)
  */
 
+import { getRefreshTokenCookie } from './cookies';
+
 export interface DecodedRefreshToken {
   sub: string;
   user_id: number;
@@ -50,7 +52,7 @@ export function decodeJWT<T = unknown>(token: string): T | null {
  * Decodes the refresh token and returns user role information
  */
 export function decodeRefreshToken(): DecodedRefreshToken | null {
-  const refreshToken = localStorage.getItem('refresh_token');
+  const refreshToken = getRefreshTokenCookie();
   if (!refreshToken) {
     return null;
   }

@@ -98,7 +98,7 @@ function App() {
       setCurrentFile(filename || 'database');
       setSelectedFile(filename);
       localStorage.setItem('currentFile', filename || 'database');
-      await loadAvailableFiles();
+      // Note: loadAvailableFiles() is already called in useFileUpload hook after upload
 
       // Use the upload_id directly from the API response instead of searching for it
       if (uploadId) {
@@ -153,20 +153,21 @@ function App() {
       const urlParams = new URLSearchParams(window.location.search);
       const ssoToken = urlParams.get('token');
 
-      if (ssoToken) {
-        // Fresh SSO login: wipe any stale tokens/user data so we don't mix clinics
-        const { setAccessToken } = await import('./services/api');
-        setAccessToken(null);
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('currentFile');
-        localStorage.removeItem('callingInProgress');
-        localStorage.removeItem('activeCalls');
-        setIsSSOMode(true);
-        setCheckingAuth(false);
-        return;
-      }
+    if (ssoToken) {
+      // Fresh SSO login: wipe any stale tokens/user data so we don't mix clinics
+      const { setAccessToken } = await import('./services/api');
+      const { removeRefreshTokenCookie } = await import('./lib/cookies');
+      setAccessToken(null);
+      localStorage.removeItem('access_token');
+      removeRefreshTokenCookie();
+      localStorage.removeItem('user');
+      localStorage.removeItem('currentFile');
+      localStorage.removeItem('callingInProgress');
+      localStorage.removeItem('activeCalls');
+      setIsSSOMode(true);
+      setCheckingAuth(false);
+      return;
+    }
 
       // Check for refresh_token and decode it to get user data
       const decodedToken = decodeRefreshToken();
@@ -184,11 +185,12 @@ function App() {
         };
         setUser(userData);
         
-        // Get access_token using refresh_token
+        // Get access_token using refresh_token from cookie
         try {
           const { setAccessToken } = await import('./services/api');
+          const { getRefreshTokenCookie } = await import('./lib/cookies');
           const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-          const refreshToken = localStorage.getItem('refresh_token');
+          const refreshToken = getRefreshTokenCookie();
           if (refreshToken) {
             const response = await fetch(`${API_URL}/refresh`, {
               method: 'POST',
@@ -306,9 +308,10 @@ function App() {
   const handleLogout = async () => {
     stopAutoRefresh();
     const { setAccessToken } = await import('./services/api');
+    const { removeRefreshTokenCookie } = await import('./lib/cookies');
     setAccessToken(null);
     localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
+    removeRefreshTokenCookie();
     localStorage.removeItem('user');
     localStorage.removeItem('currentFile');
     localStorage.removeItem('callingInProgress');

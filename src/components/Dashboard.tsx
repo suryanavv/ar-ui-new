@@ -239,6 +239,14 @@ export const Dashboard = () => {
     }).format(amount);
   };
 
+  const capitalizeName = (name: string): string => {
+    return name
+      .toLowerCase()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -480,7 +488,7 @@ export const Dashboard = () => {
                                 </td>
                                 <td className="py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4">
                                   <span className="text-[10px] sm:text-xs md:text-sm font-semibold text-foreground break-words">
-                                    {`${call.patient_first_name || ''} ${call.patient_last_name || ''}`.trim() || 'Unknown'}
+                                    {`${call.patient_first_name || ''} ${call.patient_last_name || ''}`.trim() ? capitalizeName(`${call.patient_first_name || ''} ${call.patient_last_name || ''}`.trim()) : 'Unknown'}
                                   </span>
                                 </td>
                                 <td className="py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4 text-right">
@@ -680,7 +688,7 @@ export const Dashboard = () => {
                       <tr key={index} className="bg-transparent hover:bg-white/10 transition-all duration-200">
                         <td className="py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4">
                           <span className="text-[10px] sm:text-xs md:text-sm font-semibold text-foreground break-words">
-                            {`${call.patient_first_name || ''} ${call.patient_last_name || ''}`.trim() || 'Unknown'}
+                            {`${call.patient_first_name || ''} ${call.patient_last_name || ''}`.trim() ? capitalizeName(`${call.patient_first_name || ''} ${call.patient_last_name || ''}`.trim()) : 'Unknown'}
                           </span>
                         </td>
                         <td className="py-1 sm:py-1.5 md:py-2 lg:py-3 px-1 sm:px-1.5 md:px-2 lg:px-4">
@@ -729,7 +737,7 @@ export const Dashboard = () => {
                   {stats.paid_patients.map((patient, i) => (
                     <div key={i} className="p-3 sm:p-4 liquid-glass rounded-lg sm:rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 border border-white/20 hover:border-white/30 transition-all">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm sm:text-base text-foreground break-words">{`${patient.patient_first_name || ''} ${patient.patient_last_name || ''}`.trim() || 'Unknown'}</p>
+                        <p className="font-medium text-sm sm:text-base text-foreground break-words">{`${patient.patient_first_name || ''} ${patient.patient_last_name || ''}`.trim() ? capitalizeName(`${patient.patient_first_name || ''} ${patient.patient_last_name || ''}`.trim()) : 'Unknown'}</p>
                         <p className="text-xs sm:text-sm text-foreground break-words">Invoice: {patient.invoice_number}</p>
                         {patient.payment_completed_at && (
                           <p className="text-[10px] sm:text-xs text-foreground">{formatDateTime(patient.payment_completed_at)}</p>

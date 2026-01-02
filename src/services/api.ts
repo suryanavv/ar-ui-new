@@ -69,8 +69,9 @@ api.interceptors.response.use(
     // ============================================
     if (error.response?.status === 401 && !originalRequest._tokenRefreshRetry) {
       
-      // Check if refresh token exists
-      const refreshToken = localStorage.getItem('refresh_token');
+      // Check if refresh token exists in cookie
+      const { getRefreshTokenCookie } = await import('../lib/cookies');
+      const refreshToken = getRefreshTokenCookie();
       if (!refreshToken) {
         // No refresh token available - dispatch session expired event
         setAccessToken(null);
@@ -133,7 +134,8 @@ api.interceptors.response.use(
         isRefreshing = false;
         
         setAccessToken(null);
-        localStorage.removeItem('refresh_token');
+        const { removeRefreshTokenCookie } = await import('../lib/cookies');
+        removeRefreshTokenCookie();
         localStorage.removeItem('user');
         
         window.dispatchEvent(new CustomEvent('session-expired'));

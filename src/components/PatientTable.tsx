@@ -239,7 +239,12 @@ export const PatientTable = ({
       return 'Unknown';
     }
 
-    return fullName || 'Unknown';
+    // Capitalize first letter of each word
+    return fullName
+      .toLowerCase()
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ') || 'Unknown';
   };
 
   // Format currency

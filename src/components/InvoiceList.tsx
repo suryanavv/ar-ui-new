@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
-import { getFileUploadHistory, getPatientsByUploadId, callPatient, endCall, getCallStatus, updatePatient } from '../services/api';
+import { useEffect, useState, useRef } from 'react';
+import { callPatient, endCall, getCallStatus, updatePatient } from '../services/api';
+import { usePatientData } from '../hooks/usePatientData';
+import { useFileUpload } from '../hooks/useFileUpload';
 import type { Patient } from '../types';
 import { formatDateTime } from '../utils/timezone';
 import { getPatientCallKey } from '../utils/patientUtils';
@@ -32,12 +34,33 @@ interface InvoiceListProps {
 }
 
 export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
-  const [uploads, setUploads] = useState<FileUpload[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { patients, loading: patientsLoading, loadPatientData } = usePatientData();
+  const { availableFiles, loadAvailableFiles } = useFileUpload({});
   const [selectedUploadId, setSelectedUploadId] = useState<number | null>(null);
-  const [patients, setPatients] = useState<Patient[]>([]);
   const [disableAnimations, setDisableAnimations] = useState(true);
   const { toasts, showToast, removeToast } = useToast();
+  const patientsRef = useRef<Patient[]>([]);
+  
+  // Keep ref in sync with patients state
+  useEffect(() => {
+    patientsRef.current = patients;
+  }, [patients]);
+  
+  // Convert availableFiles to FileUpload format for compatibility
+  const uploads: FileUpload[] = availableFiles.map(file => ({
+    id: file.id,
+    filename: file.filename,
+    created_at: file.uploaded_at,
+    uploaded_at: file.uploaded_at,
+    patient_count: file.patient_count
+  }));
+  
+  const loading = availableFiles.length === 0 && !patientsLoading;
+
+  // Load available files on mount
+  useEffect(() => {
+    loadAvailableFiles();
+  }, [loadAvailableFiles]);
 
   // Re-enable transitions after initial render and when loading completes
   useEffect(() => {
@@ -65,7 +88,6 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
       </svg>
     );
   };
-  const [loadingPatients, setLoadingPatients] = useState(false);
   const [showCallHistoryModal, setShowCallHistoryModal] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showCallConfirmModal, setShowCallConfirmModal] = useState(false);
@@ -74,24 +96,6 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
   const [patientToCall, setPatientToCall] = useState<Patient | null>(null);
   const [activeCalls, setActiveCalls] = useState<Map<string, { timestamp: number; conversationId?: string; callSid?: string; twilioStatus?: string }>>(new Map());
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
-
-
-  const loadUploads = async () => {
-    try {
-      setLoading(true);
-      const response = await getFileUploadHistory();
-      setUploads(response.history || []);
-    } catch (error) {
-      console.error('Failed to load uploads:', error);
-      setUploads([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadUploads();
-  }, []);
 
   // Clean up activeCalls when patient data changes - remove entries for completed/failed calls
   useEffect(() => {
@@ -120,35 +124,27 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
 
   const handleOpenUpload = async (uploadId: number) => {
     setSelectedUploadId(uploadId);
-    setLoadingPatients(true);
     try {
-      const response = await getPatientsByUploadId(uploadId);
-      setPatients(response.patients || []);
+      await loadPatientData(uploadId, false);
       if (onFileSelect) {
         onFileSelect(uploadId);
       }
     } catch (error) {
       console.error('Failed to load patients:', error);
-      setPatients([]);
-    } finally {
-      setLoadingPatients(false);
     }
   };
 
-  const handleBack = () => {
+  const handleBack = async () => {
     setSelectedUploadId(null);
-    setPatients([]);
+    await loadPatientData(null, false);
   };
 
   const handleUpdatePatient = async (invoiceId: number, updates: Record<string, any>) => {
     try {
       await updatePatient(invoiceId, updates);
       showMessage('success', 'Patient updated successfully');
-      // Refresh patient data
-      if (selectedUploadId) {
-        const response = await getPatientsByUploadId(selectedUploadId);
-        setPatients(response.patients || []);
-      }
+      // Refresh patient data using hook
+      await loadPatientData(selectedUploadId, true);
       // Refresh dashboard if available
       const refreshDashboard = (window as { refreshDashboard?: () => void }).refreshDashboard;
       if (typeof refreshDashboard === 'function') {
@@ -252,11 +248,8 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
 
         showToast('success', `Call ended with ${fullName}`);
 
-        // Refresh patient data to update call status
-        if (selectedUploadId) {
-          const response = await getPatientsByUploadId(selectedUploadId);
-          setPatients(response.patients || []);
-        }
+        // Refresh patient data to update call status using hook
+        await loadPatientData(selectedUploadId, true);
       } else {
         showToast('error', 'Failed to end call');
       }
@@ -310,11 +303,8 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
         });
 
         showMessage('success', `Call initiated to ${fullName}`);
-        // Reload patients to refresh call count and status
-        if (selectedUploadId) {
-          const response = await getPatientsByUploadId(selectedUploadId);
-          setPatients(response.patients || []);
-        }
+        // Reload patients to refresh call count and status using hook
+        await loadPatientData(selectedUploadId, true);
 
         // Start polling call status using the new endpoint
         if ((result as { call_sid?: string }).call_sid) {
@@ -333,44 +323,36 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
                 const isCallComplete = twilioStatus && ['completed', 'busy', 'failed', 'no-answer', 'canceled'].includes(twilioStatus);
 
                 if (isCallComplete) {
-                  // Call has ended - refresh patient data to get notes
-                  if (selectedUploadId) {
-                    const response = await getPatientsByUploadId(selectedUploadId);
-                    const updatedPatients = response.patients || [];
-                    setPatients(updatedPatients);
+                  // Call has ended - refresh patient data to get notes using hook
+                  await loadPatientData(selectedUploadId, true);
+                  
+                  // Small delay to allow state update, then check notes using ref
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  
+                  // Check if notes are available using ref (has latest patients)
+                  const patient = patientsRef.current.find(p =>
+                    p.phone_number === phoneNumber &&
+                    p.invoice_number === patientToCall.invoice_number &&
+                    p.patient_first_name === patientToCall.patient_first_name &&
+                    p.patient_last_name === patientToCall.patient_last_name
+                  );
 
-                    // Check if notes are available
-                    const patient = updatedPatients.find(p =>
-                      p.phone_number === phoneNumber &&
-                      p.invoice_number === patientToCall.invoice_number &&
-                      p.patient_first_name === patientToCall.patient_first_name &&
-                      p.patient_last_name === patientToCall.patient_last_name
-                    );
-
-                    if (patient?.recent_call_notes && patient.recent_call_notes.trim()) {
-                      // Notes are updated - stop polling and remove from activeCalls
-                      setActiveCalls(prev => {
-                        const newMap = new Map(prev);
-                        newMap.delete(callKey);
-                        return newMap;
-                      });
-                      clearInterval(singleCallRefreshInterval);
-                      return;
-                    }
-                    // If notes not updated yet, continue polling for a bit
+                  if (patient?.recent_call_notes && patient.recent_call_notes.trim()) {
+                    // Notes are updated - stop polling and remove from activeCalls
+                    setActiveCalls(prev => {
+                      const newMap = new Map(prev);
+                      newMap.delete(callKey);
+                      return newMap;
+                    });
+                    clearInterval(singleCallRefreshInterval);
+                    return;
                   }
+                  // If notes not updated yet, continue polling for a bit
                 }
               } catch (error) {
                 console.error('Failed to check call status:', error);
-                // Fallback to patient data refresh if status endpoint fails
-                try {
-                  if (selectedUploadId) {
-                    const response = await getPatientsByUploadId(selectedUploadId);
-                    setPatients(response.patients || []);
-                  }
-                } catch (refreshError) {
-                  console.error('Failed to refresh patient data:', refreshError);
-                }
+                // Note: Patient data will be refreshed when call completes
+                // Only refresh here if we haven't already refreshed recently
               }
 
               refreshCount++;
@@ -381,12 +363,9 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
                 newMap.delete(callKey);
                 return newMap;
               });
-              // Final reload
+              // Final reload using hook
               try {
-                if (selectedUploadId) {
-                  const response = await getPatientsByUploadId(selectedUploadId);
-                  setPatients(response.patients || []);
-                }
+                await loadPatientData(selectedUploadId, true);
               } catch (error) {
                 console.error('Failed to refresh patient data:', error);
               }
@@ -493,7 +472,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
             </div>
           </div>
 
-          {loadingPatients ? (
+          {patientsLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center liquid-glass-strong rounded-2xl p-4 sm:p-6 md:p-8">
                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
@@ -573,7 +552,7 @@ export const InvoiceList = ({ onFileSelect }: InvoiceListProps) => {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-foreground">Uploaded Files</h2>
           <button
-            onClick={loadUploads}
+            onClick={loadAvailableFiles}
             className="liquid-glass-btn-primary px-4 py-2 text-sm font-medium rounded-xl transition-colors"
           >
             Refresh

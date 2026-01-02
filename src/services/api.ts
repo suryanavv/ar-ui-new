@@ -1,6 +1,6 @@
 import axios from 'axios';
 import type { Patient, BatchCallResult } from '../types';
-import { formatDateTime } from '../utils/timezone';
+// import { formatDateTime } from '../utils/timezone';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -223,31 +223,18 @@ export interface FileUploadItem {
   updated_count: number;
   error_count: number;
   created_at: string | null;
+  total_paid_amount?: string;
 }
 
 // Get list of available CSV files - returns all uploads with formatted display names
-export const getAvailableFiles = async (): Promise<{ success: boolean; files: Array<{ id: number; filename: string; displayName: string; uploaded_at: string | null; patient_count: number }>; count: number }> => {
+export const getAvailableFiles = async (): Promise<{ success: boolean; files: Array<{ id: number; filename: string; displayName: string; uploaded_at: string | null; patient_count: number; total_paid_amount?: string }>; count: number }> => {
   // Use unified /files endpoint - returns history when no upload_id is provided
   const response = await api.get<{ success: boolean; history: FileUploadItem[]; count: number }>('/files');
   const history = response.data.history || [];
   
-  // Format display name with date and time in system timezone
+  // Format display name - just return the filename
   const formatDisplayName = (item: FileUploadItem): string => {
-    const filename = item.filename || 'Unknown';
-    if (item.uploaded_at) {
-      // Use formatDateTime utility which handles UTC to local timezone conversion
-      // and formats according to system timezone settings
-      const formattedDateTime = formatDateTime(item.uploaded_at, {
-        includeDate: true,
-        includeTime: true,
-        hour12: true
-      });
-      
-      if (formattedDateTime && formattedDateTime !== 'N/A') {
-        return `${filename} - ${formattedDateTime}`;
-      }
-    }
-    return filename;
+    return item.filename || 'Unknown';
   };
   
   // Return all uploads with formatted display names, sorted by most recent first
@@ -257,7 +244,8 @@ export const getAvailableFiles = async (): Promise<{ success: boolean; files: Ar
     filename: item.filename,
     displayName: formatDisplayName(item),
     uploaded_at: item.uploaded_at,
-      patient_count: item.patient_count
+      patient_count: item.patient_count,
+      total_paid_amount: item.total_paid_amount
     }))
     .sort((a, b) => {
       const dateA = a.uploaded_at ? new Date(a.uploaded_at).getTime() : 0;

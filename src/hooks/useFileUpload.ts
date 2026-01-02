@@ -7,6 +7,7 @@ interface FileOption {
   displayName: string;
   uploaded_at: string | null;
   patient_count: number;
+  total_paid_amount?: string;
 }
 
 interface UseFileUploadOptions {

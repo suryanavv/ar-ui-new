@@ -15,6 +15,7 @@ interface FileOption {
   displayName: string;
   uploaded_at: string | null;
   patient_count: number;
+  total_paid_amount?: string;
 }
 
 interface UploadSectionProps {
@@ -249,16 +250,13 @@ export const UploadSection = ({
           <div>
             <h3 className="text-lg font-bold text-foreground">Manage and export patient data</h3>
           </div>
-          <label
-            className={`relative overflow-hidden rounded-xl px-4 py-2 text-sm font-semibold inline-flex items-center gap-2 transition-all duration-300 group
-              bg-gradient-to-br from-primary/80 to-[#26C6C0]/80 backdrop-blur-xl border border-white/30
-              shadow-[0_4px_20px_rgba(0,0,0,0.05)] hover:shadow-[0_0_25px_rgba(14,165,163,0.4)]
-              hover:scale-[1.02] text-white ${uploadLoading ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+          <Button
+            className="liquid-glass-btn-primary"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadLoading}
           >
-            {/* Sliding Shine Effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 pointer-events-none" />
-            <FiUpload size={16} className="relative z-10" />
-            <span className="relative z-10">{uploadLoading ? 'Uploading...' : 'Upload New File'}</span>
+            <FiUpload size={18} />
+            <span>{uploadLoading ? 'Uploading...' : 'Upload New File'}</span>
             <input
               ref={fileInputRef}
               type="file"
@@ -267,7 +265,7 @@ export const UploadSection = ({
               disabled={uploadLoading}
               className="hidden"
             />
-          </label>
+          </Button>
         </div>
 
 

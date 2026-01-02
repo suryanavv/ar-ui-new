@@ -388,10 +388,10 @@ export const PatientTable = ({
     }
 
     return (
-      <td className={`${className} group relative overflow-hidden`}>
+      <td className={`${className} group relative`}>
         <div className="flex items-center gap-1 min-w-0">
           <div
-            className="flex-1 min-w-0 overflow-hidden"
+            className="flex-1 min-w-0"
             onClick={(e) => {
               if ((e.target as HTMLElement).tagName === 'BUTTON') {
                 return;
@@ -641,22 +641,23 @@ export const PatientTable = ({
 
       <div className="overflow-hidden rounded-xl flex-1 flex flex-col relative z-10">
         {/* Header scroll container */}
-        <div ref={headerScrollRef} onScroll={handleHeaderScroll} className="overflow-x-auto">
+        <div ref={headerScrollRef} onScroll={handleHeaderScroll} className="overflow-x-auto xl:overflow-x-hidden">
           {/* Header Table - not scrollable vertically */}
-          <table className="w-full text-sm min-w-[1000px]" style={{ tableLayout: 'fixed' }}>
+          <table className="w-full text-xs sm:text-sm xl:w-full lg:min-w-[1100px] md:min-w-[1000px] min-w-[800px]" style={{ tableLayout: 'fixed' }}>
             <colgroup>
-              <col style={{ width: onSelectionChange ? '2.5%' : '0%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '11%' }} />
+              <col style={{ width: onSelectionChange ? '2%' : '0%' }} />
+              <col style={{ width: '8%' }} />
               <col style={{ width: '10%' }} />
               <col style={{ width: '8%' }} />
-              <col style={{ width: '6%' }} />
-              <col style={{ width: '6%' }} />
               <col style={{ width: '7%' }} />
               <col style={{ width: '7%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
               <col style={{ width: '4%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '9%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '7%' }} />
             </colgroup>
             <thead className="bg-[#9a8ea2]">
               <tr>
@@ -678,7 +679,7 @@ export const PatientTable = ({
                 </th>
 
                 {/* Patient Name with Sort */}
-                <th className={`text-left font-semibold py-2 px-2 text-foreground text-sm overflow-hidden ${!onSelectionChange ? 'pl-4' : ''}`}>
+                <th className={`text-left font-semibold py-2 px-2 text-foreground text-xs sm:text-sm overflow-hidden ${!onSelectionChange ? 'pl-4' : ''}`}>
                   <div className="flex items-center gap-1 group">
                     <span>Patient Name</span>
                     <TooltipProvider>
@@ -709,60 +710,72 @@ export const PatientTable = ({
                 </th>
 
                 {/* Phone Number */}
-                <th className="text-left font-semibold py-2 px-2 text-foreground text-sm whitespace-nowrap truncate">Phone Number</th>
+                <th className="text-left font-semibold py-2 px-2 text-foreground text-xs sm:text-sm">Phone Number</th>
 
                 {/* Outstanding Balance */}
-                <th className="text-left font-semibold py-2 px-2 text-foreground text-sm">
+                <th className="text-left font-semibold py-2 px-1 text-foreground text-xs sm:text-sm">
                   <div className="flex flex-col leading-tight">
                     <span>Outstanding</span>
                     <span>Balance</span>
                   </div>
                 </th>
 
+                {/* Total Paid */}
+                <th className="text-left font-semibold py-2 px-1 text-foreground text-xs sm:text-sm">
+                  <div className="flex flex-col leading-tight">
+                    <span>Total</span>
+                    <span>Paid</span>
+                  </div>
+                </th>
+
                 {/* Appointments */}
-                <th className="text-center font-semibold py-2 px-1 text-foreground text-sm whitespace-nowrap">Appointments</th>
+                <th className="text-center font-semibold py-2 px-0.5 text-foreground text-xs sm:text-sm">
+                  <span className="lg:hidden">Appts</span>
+                  <span className="hidden lg:inline">Appointments</span>
+                </th>
 
                 {/* Link Req */}
-                <th className="text-center font-semibold py-2 px-1 text-foreground text-sm whitespace-nowrap">Link Req</th>
+                <th className="text-center font-semibold py-2 px-1 text-foreground text-xs sm:text-sm whitespace-nowrap">Link Req</th>
 
                 {/* Link Sent */}
-                <th className="text-center font-semibold py-2 px-1 text-foreground text-sm whitespace-nowrap">Link Sent</th>
+                <th className="text-center font-semibold py-2 px-1 text-foreground text-xs sm:text-sm whitespace-nowrap">Link Sent</th>
 
                 {/* Est Date */}
-                <th className="text-left font-semibold py-2 px-2 text-foreground text-sm whitespace-nowrap">Est Date</th>
+                <th className="text-left font-semibold py-2 px-2 text-foreground text-xs sm:text-sm whitespace-nowrap">Est Date</th>
 
                 {/* Call Status */}
-                <th className="text-center font-semibold py-2 px-1 text-foreground text-sm whitespace-nowrap">Call Status</th>
+                <th className="text-center font-semibold py-2 px-1 text-foreground text-xs sm:text-sm whitespace-nowrap">Call Status</th>
 
                 {/* Calls */}
-                <th className="text-center font-semibold py-2 px-1 text-foreground text-sm whitespace-nowrap">Calls</th>
+                <th className="text-center font-semibold py-2 px-1 text-foreground text-xs sm:text-sm whitespace-nowrap">Calls</th>
 
                 {/* Recent Notes */}
-                <th className="text-left font-semibold py-2 px-2 text-foreground text-sm whitespace-nowrap truncate">Recent Notes</th>
+                <th className="text-left font-semibold py-2 px-2 text-foreground text-xs sm:text-sm whitespace-nowrap truncate">Recent Notes</th>
 
                 {/* Actions */}
-                <th className="text-left font-semibold py-2 px-2 text-foreground text-sm whitespace-nowrap">Actions</th>
+                <th className="text-left font-semibold py-2 px-2 text-foreground text-xs sm:text-sm whitespace-nowrap">Actions</th>
               </tr>
             </thead>
           </table>
 
         </div>
         {/* Scrollable Body Container - synced horizontal scroll with header */}
-        <div ref={bodyScrollRef} onScroll={handleBodyScroll} className="max-h-[70vh] overflow-auto flex-1 bg-white/80 rounded-lg">
-          <table className="w-full text-sm min-w-[1000px]" style={{ tableLayout: 'fixed' }}>
+        <div ref={bodyScrollRef} onScroll={handleBodyScroll} className="max-h-[70vh] overflow-auto xl:overflow-x-hidden flex-1 bg-white/80 rounded-lg">
+          <table className="w-full text-xs sm:text-sm xl:w-full lg:min-w-[1100px] md:min-w-[1000px] min-w-[800px]" style={{ tableLayout: 'fixed' }}>
             <colgroup>
-              <col style={{ width: onSelectionChange ? '2.5%' : '0%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '11%' }} />
+              <col style={{ width: onSelectionChange ? '2%' : '0%' }} />
+              <col style={{ width: '8%' }} />
               <col style={{ width: '10%' }} />
               <col style={{ width: '8%' }} />
-              <col style={{ width: '6%' }} />
-              <col style={{ width: '6%' }} />
               <col style={{ width: '7%' }} />
               <col style={{ width: '7%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '5%' }} />
+              <col style={{ width: '6%' }} />
+              <col style={{ width: '6%' }} />
               <col style={{ width: '4%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '9%' }} />
+              <col style={{ width: '8%' }} />
+              <col style={{ width: '7%' }} />
             </colgroup>
             <tbody className="divide-y divide-[#9a8ea2]/30">
               {sortedPatients.map((patient, index) => {
@@ -824,7 +837,7 @@ export const PatientTable = ({
                       field="phone_number"
                       displayValue={
                         patient.phone_number && patient.phone_number.toLowerCase() !== 'nan' && patient.phone_number.length >= 10 ? (
-                          <span className="font-medium">{patient.phone_number}</span>
+                          <span className="font-medium whitespace-nowrap">{patient.phone_number}</span>
                         ) : (
                           <span className="text-destructive italic font-semibold">Missing</span>
                         )
@@ -850,11 +863,18 @@ export const PatientTable = ({
                           <span className="text-muted-foreground">-</span>
                         )
                       }
-                      className="py-2 px-2"
+                      className="py-2 px-1"
                     />
 
+                    {/* Total Paid */}
+                    <td className="py-2 px-1">
+                      <span className={parseFloat(patient.total_paid_amount || '0') > 0 ? 'text-green-600 font-bold' : 'text-foreground font-semibold'}>
+                        {formatCurrency(patient.total_paid_amount || '0')}
+                      </span>
+                    </td>
+
                     {/* Appointments */}
-                    <td className="py-2 px-1 text-center">
+                    <td className="py-2 px-0.5 text-center">
                       {onViewAppointments && (patient.appointment_count || 0) > 0 ? (
                         <button
                           onClick={(e) => {

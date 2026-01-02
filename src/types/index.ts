@@ -41,6 +41,7 @@ export interface Patient {
   last_called_at?: string;
   payment_status?: string; // pending, completed, failed, refunded
   amount_paid?: string; // Amount paid by patient
+  total_paid_amount?: string; // Total amount paid by patient across all invoices
   recent_call_notes?: string; // Most recent call notes from call history
   last_3_attempts?: string[]; // Last 3 call attempts for hover tooltip
   // Additional fields for detailed view
